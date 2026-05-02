@@ -1,0 +1,8 @@
+train:
+  epochs: 80
+  learning_rate: 0.0001
+  loss: dice_ce
+data:
+  batch_size: 8
+eval:
+  metrics: [iou, dice, pixel_accuracy]

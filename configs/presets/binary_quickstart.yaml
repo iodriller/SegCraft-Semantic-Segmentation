@@ -1,0 +1,9 @@
+task:
+  type: binary
+  num_classes: 1
+  class_names: [background, foreground]
+train:
+  loss: auto
+  epochs: 10
+model:
+  name: unet

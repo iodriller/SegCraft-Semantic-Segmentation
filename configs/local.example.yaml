@@ -1,0 +1,10 @@
+# Copy this to configs/local.yaml and edit for your machine-specific paths.
+data:
+  train_images: /absolute/path/to/train/images
+  train_masks: /absolute/path/to/train/masks
+  val_images: /absolute/path/to/val/images
+  val_masks: /absolute/path/to/val/masks
+predict:
+  input_path: /absolute/path/to/inference/images
+runtime:
+  output_dir: /absolute/path/to/outputs

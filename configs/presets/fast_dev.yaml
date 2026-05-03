@@ -1,0 +1,9 @@
+# Use with: segcraft --config configs/base.yaml
+# Then manually copy overrides or future merge utility.
+train:
+  epochs: 1
+data:
+  batch_size: 2
+  image_size: [256, 256]
+runtime:
+  device: cpu

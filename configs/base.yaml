@@ -1,0 +1,38 @@
+task:
+  type: multiclass
+  num_classes: 3
+  class_names: [background, road, person]
+  ignore_index: 255
+
+model:
+  name: unet
+  encoder: resnet34
+  pretrained: true
+
+data:
+  train_images: data/train/images
+  train_masks: data/train/masks
+  val_images: data/val/images
+  val_masks: data/val/masks
+  image_size: [512, 512]
+  batch_size: 4
+  num_workers: 4
+
+train:
+  epochs: 20
+  optimizer: adam
+  learning_rate: 0.0003
+  loss: auto
+
+eval:
+  metrics: []
+
+predict:
+  input_path: data/infer/images
+  output_path: outputs/predictions
+  overlay_alpha: 0.5
+
+runtime:
+  seed: 42
+  device: auto
+  output_dir: outputs

@@ -87,6 +87,8 @@ def write_video_from_images(
     output_path: str | Path,
     *,
     fps: float = 6.0,
+    codec: str | None = None,
+    verify: bool = True,
 ) -> dict[str, Any]:
     """Write a video from a folder of sorted image files."""
     cv2 = _cv2()
@@ -99,29 +101,62 @@ def write_video_from_images(
         raise ValueError(f"Could not read image: {image_paths[0]}")
 
     height, width = first.shape[:2]
+    if width % 2:
+        width -= 1
+    if height % 2:
+        height -= 1
+
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    chosen_codec = codec or _default_codec(output_path)
     writer = cv2.VideoWriter(
         str(output_path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
+        cv2.VideoWriter_fourcc(*chosen_codec),
         fps,
         (width, height),
     )
-    for image_path in image_paths:
-        frame = cv2.imread(str(image_path))
-        if frame is None:
-            raise ValueError(f"Could not read image: {image_path}")
-        if frame.shape[:2] != (height, width):
-            frame = cv2.resize(frame, (width, height))
-        writer.write(frame)
-    writer.release()
+    if not writer.isOpened():
+        raise RuntimeError(f"Could not open video writer for {output_path} with codec {chosen_codec}")
+
+    try:
+        for image_path in image_paths:
+            frame = cv2.imread(str(image_path))
+            if frame is None:
+                raise ValueError(f"Could not read image: {image_path}")
+            if frame.shape[:2] != (height, width):
+                frame = cv2.resize(frame, (width, height))
+            writer.write(frame)
+    finally:
+        writer.release()
+
+    if verify:
+        _verify_video(output_path)
 
     return {
         "video_path": str(output_path),
         "frames": len(image_paths),
         "fps": fps,
         "size": [width, height],
+        "codec": chosen_codec,
     }
+
+
+def _default_codec(output_path: Path) -> str:
+    if output_path.suffix.lower() == ".avi":
+        return "MJPG"
+    return "mp4v"
+
+
+def _verify_video(path: Path) -> None:
+    cv2 = _cv2()
+    cap = cv2.VideoCapture(str(path))
+    try:
+        ok, frame = cap.read()
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if not cap.isOpened() or not ok or frame is None or frame_count < 1:
+            raise RuntimeError(f"Video was written but could not be read back: {path}")
+    finally:
+        cap.release()
 
 
 def _cv2() -> Any:

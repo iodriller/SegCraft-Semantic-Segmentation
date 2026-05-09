@@ -120,9 +120,11 @@ def _create_torchvision_model(spec: Mapping[str, Any]) -> Any:
     if weights is not None:
         return factory(weights=weights)
 
-    kwargs = {"num_classes": spec["num_classes"], "weights": None}
-    if spec["pretrained"]:
-        kwargs["weights_backbone"] = "DEFAULT"
+    kwargs = {
+        "num_classes": spec["num_classes"],
+        "weights": None,
+        "weights_backbone": "DEFAULT" if spec["pretrained"] else None,
+    }
     try:
         return factory(**kwargs)
     except TypeError:

@@ -8,5 +8,7 @@ data:
   mask_suffix: ""
 predict:
   input_path: /absolute/path/to/inference/images
+  output_path: /absolute/path/to/predictions
+  save_video: true
 runtime:
   output_dir: /absolute/path/to/outputs

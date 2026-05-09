@@ -4,10 +4,9 @@ SegCraft is a small, config-first semantic segmentation toolkit. The goal is
 simple: keep experiments readable, move project choices into YAML, and expose a
 Python API that notebooks and scripts can share.
 
-The current package supports typed configuration, dataset discovery, model
-selection, real image-folder prediction, small video helpers, CLI entry points,
-and tests. Training and evaluation are still lightweight workflow summaries
-while the data/model pieces settle.
+The current package supports typed configuration, paired image/mask datasets,
+model selection, supervised train/evaluate loops, image-folder prediction,
+small video helpers, CLI entry points, and tests.
 
 ## Install
 
@@ -48,7 +47,8 @@ segcraft predict --config configs/base.yaml --local configs/local.yaml
 `configs/local.yaml` should point `predict.input_path` at your images and
 `predict.output_path` at the folder where masks and overlays should be saved.
 
-Train/evaluate currently return structured summaries:
+Train/evaluate use the paired image and mask paths from the config. If those
+paths do not exist yet, the commands return a clear `data_missing` summary.
 
 ```bash
 segcraft train --config configs/base.yaml --preset configs/presets/fast_dev.yaml
@@ -69,7 +69,7 @@ Prepare a short video clip:
 from pathlib import Path
 from segcraft.video import download_youtube, extract_frames
 
-url = "https://www.youtube.com/watch?v=ZpYBDJv5KAU"
+url = "https://www.youtube.com/watch?v=BHYOo3JCuvk"
 video_path = download_youtube(url, "data/demo/video.mp4")
 extract_frames(video_path, "data/demo/frames", every_seconds=1.0, max_frames=10)
 
@@ -90,7 +90,9 @@ segcraft predict --config configs/base.yaml --preset configs/presets/fast_dev.ya
 ```
 
 The command writes indexed mask PNGs under `outputs/demo_predictions/masks` and
-overlay JPGs under `outputs/demo_predictions/overlays`.
+overlay JPGs under `outputs/demo_predictions/overlays`. It also writes an
+overlay video to `outputs/demo_predictions/overlay.mp4` when `predict.save_video`
+is enabled.
 
 To stitch the overlays back into a quick MP4:
 
@@ -167,6 +169,9 @@ src/segcraft/
   engine/
   metrics/
   models/
+  prediction/
+  training.py
+  video.py
 configs/
 notebooks/
 tests/

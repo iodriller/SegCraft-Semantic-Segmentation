@@ -16,6 +16,7 @@ def base_config(task_type="multiclass", num_classes=3):
 def test_train_auto_loss_multiclass():
     summary = train(base_config())
     assert summary["train"]["loss"] == "cross_entropy_dice"
+    assert summary["train"]["status"] == "data_missing"
 
 
 def test_train_auto_loss_binary():
@@ -33,3 +34,8 @@ def test_predict_missing_input_reports_status_without_torch():
     summary = predict(base_config())
     assert summary["predict"]["status"] == "input_missing"
     assert "does not exist" in summary["predict"]["message"]
+
+
+def test_evaluate_missing_data_reports_status_without_torch():
+    summary = evaluate(base_config())
+    assert summary["eval"]["status"] == "data_missing"

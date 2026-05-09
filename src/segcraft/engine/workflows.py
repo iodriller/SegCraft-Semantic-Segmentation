@@ -8,6 +8,7 @@ from segcraft.config import SegCraftConfig, parse_config
 from segcraft.metrics import resolve_metrics
 from segcraft.models import build_model
 from segcraft.prediction import run_prediction
+from segcraft.training import run_evaluation, run_training
 
 
 LOSS_BY_TASK = {
@@ -46,12 +47,14 @@ def train(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
         "learning_rate": cfg.train.learning_rate,
         "loss": _resolve_loss(cfg),
     }
+    summary["train"].update(run_training(cfg))
     return summary
 
 
 def evaluate(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
-    _, summary = _common_summary("evaluate", config)
+    cfg, summary = _common_summary("evaluate", config)
     summary["eval"] = {"metrics": summary["metrics"]}
+    summary["eval"].update(run_evaluation(cfg))
     return summary
 
 

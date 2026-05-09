@@ -37,6 +37,12 @@ def _as_positive_int(section: str, key: str, value: Any) -> int:
     return value
 
 
+def _as_nonnegative_int(section: str, key: str, value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ConfigValidationError(f"{section}.{key} must be a non-negative integer")
+    return value
+
+
 def _as_positive_float(section: str, key: str, value: Any) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
         raise ConfigValidationError(f"{section}.{key} must be a positive number")
@@ -175,7 +181,7 @@ class DataConfig:
             val_masks=_as_string("data", "val_masks", data.get("val_masks", "data/val/masks")),
             image_size=_as_image_size(data.get("image_size", [512, 512])),
             batch_size=_as_positive_int("data", "batch_size", data.get("batch_size", 4)),
-            num_workers=_as_positive_int("data", "num_workers", data.get("num_workers", 4)),
+            num_workers=_as_nonnegative_int("data", "num_workers", data.get("num_workers", 4)),
             mask_suffix=_as_string(
                 "data", "mask_suffix", data.get("mask_suffix", ""), allow_empty=True
             ),
@@ -236,17 +242,30 @@ class PredictConfig:
     input_path: str
     output_path: str
     overlay_alpha: float = 0.5
+    save_video: bool = True
+    video_fps: float = 6.0
+    video_path: str | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "PredictConfig":
         overlay_alpha = data.get("overlay_alpha", 0.5)
         if not isinstance(overlay_alpha, (int, float)) or not 0 <= overlay_alpha <= 1:
             raise ConfigValidationError("predict.overlay_alpha must be between 0 and 1")
+        save_video = data.get("save_video", True)
+        if not isinstance(save_video, bool):
+            raise ConfigValidationError("predict.save_video must be true or false")
+        video_fps = _as_positive_float("predict", "video_fps", data.get("video_fps", 6.0))
+        video_path = data.get("video_path")
+        if video_path is not None:
+            video_path = _as_string("predict", "video_path", video_path)
 
         return cls(
             input_path=_as_string("predict", "input_path", data.get("input_path")),
             output_path=_as_string("predict", "output_path", data.get("output_path")),
             overlay_alpha=float(overlay_alpha),
+            save_video=save_video,
+            video_fps=video_fps,
+            video_path=video_path,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -254,6 +273,9 @@ class PredictConfig:
             "input_path": self.input_path,
             "output_path": self.output_path,
             "overlay_alpha": self.overlay_alpha,
+            "save_video": self.save_video,
+            "video_fps": self.video_fps,
+            "video_path": self.video_path,
         }
 
 

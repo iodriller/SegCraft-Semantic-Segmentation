@@ -9,7 +9,9 @@
 - Dataset file discovery and image/mask pairing helpers.
 - Optional model factories for TorchVision and segmentation-models-pytorch.
 - Real image-folder prediction with mask and overlay outputs.
-- Small video helpers for YouTube download, frame extraction, and overlay video writing.
+- Automatic overlay video writing for prediction outputs.
+- Small video helpers for YouTube download, frame extraction, and verified video writing.
+- Minimal supervised train/evaluate loops for paired image/mask datasets.
 - CLI modes: `validate`, `train`, `evaluate`, `predict`.
 - Workflow scaffolding with task-aware loss/metric defaults.
 - Example notebook: `notebooks/01_quickstart.ipynb`.

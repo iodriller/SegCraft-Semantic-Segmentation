@@ -8,6 +8,7 @@ from typing import Any, Mapping
 from segcraft.config import SegCraftConfig, parse_config
 from segcraft.data import list_image_files
 from segcraft.models import create_model
+from segcraft.video import write_video_from_images
 
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
@@ -47,7 +48,7 @@ def run_prediction(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]
             )
             artifacts.append(artifact)
 
-    return {
+    summary = {
         "status": "completed",
         "device": str(device),
         "images_found": len(image_paths),
@@ -56,6 +57,14 @@ def run_prediction(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]
         "overlays_dir": str(overlays_dir),
         "sample_outputs": artifacts[:5],
     }
+    if cfg.predict.save_video:
+        video_path = Path(cfg.predict.video_path) if cfg.predict.video_path else output_dir / "overlay.mp4"
+        summary["overlay_video"] = write_video_from_images(
+            overlays_dir,
+            video_path,
+            fps=cfg.predict.video_fps,
+        )
+    return summary
 
 
 def _predict_one(

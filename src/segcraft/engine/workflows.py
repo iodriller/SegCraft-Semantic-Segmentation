@@ -46,6 +46,10 @@ def train(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
         "optimizer": cfg.train.optimizer,
         "learning_rate": cfg.train.learning_rate,
         "loss": _resolve_loss(cfg),
+        "scheduler": cfg.train.scheduler,
+        "amp": cfg.train.amp,
+        "resume_from": cfg.train.resume_from,
+        "early_stopping_patience": cfg.train.early_stopping_patience,
     }
     summary["train"].update(run_training(cfg))
     return summary
@@ -64,6 +68,8 @@ def predict(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
         "input_path": cfg.predict.input_path,
         "output_path": cfg.predict.output_path,
         "overlay_alpha": cfg.predict.overlay_alpha,
+        "save_video": cfg.predict.save_video,
+        "preserve_audio": cfg.predict.preserve_audio,
     }
     if not Path(cfg.predict.input_path).exists():
         summary["predict"]["status"] = "input_missing"

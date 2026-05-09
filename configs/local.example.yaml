@@ -7,9 +7,13 @@ data:
   # Set this to "_mask" if masks are named image_001_mask.png for image_001.jpg.
   mask_suffix: ""
 predict:
-  input_path: /absolute/path/to/inference/images
+  input_path: /absolute/path/to/inference/images_or_video.mp4
   output_path: /absolute/path/to/predictions
   annotate: true
   save_video: true
+  preserve_audio: true
+train:
+  # Optional: set a checkpoint path to continue a run.
+  resume_from:
 runtime:
   output_dir: /absolute/path/to/outputs

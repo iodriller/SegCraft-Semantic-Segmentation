@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
 
 from segcraft.data import list_image_files
+
+
+VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v")
 
 
 def download_youtube(
@@ -31,6 +35,37 @@ def download_youtube(
     ]
     subprocess.run(command, check=True)
     return output_path
+
+
+def is_video_file(path: str | Path) -> bool:
+    """Return true when a path looks like a video file SegCraft can stream."""
+    return Path(path).suffix.lower() in VIDEO_EXTENSIONS
+
+
+def probe_video(video_path: str | Path) -> dict[str, Any]:
+    """Read basic video metadata with OpenCV."""
+    cv2 = _cv2()
+    video_path = Path(video_path)
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Could not open video: {video_path}")
+    try:
+        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    finally:
+        cap.release()
+
+    duration_seconds = (frame_count / fps) if fps > 0 and frame_count > 0 else 0.0
+    return {
+        "video_path": str(video_path),
+        "fps": round(fps, 3),
+        "frame_count": frame_count,
+        "duration_seconds": round(duration_seconds, 3),
+        "size": [width, height],
+        "has_audio": _has_audio(video_path),
+    }
 
 
 def extract_frames(
@@ -79,6 +114,71 @@ def extract_frames(
         "frame_count": frame_count,
         "size": [width, height],
         "saved_frames": saved,
+    }
+
+
+def mux_audio_from_source(
+    source_video: str | Path,
+    silent_video: str | Path,
+    output_path: str | Path,
+) -> dict[str, Any]:
+    """Copy source audio into an overlay video when ffmpeg is available."""
+    source_video = Path(source_video)
+    silent_video = Path(silent_video)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        _replace_file(silent_video, output_path)
+        return {
+            "status": "ffmpeg_missing",
+            "preserved": False,
+            "message": "ffmpeg was not found; wrote the overlay video without source audio.",
+        }
+
+    command = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(silent_video),
+        "-i",
+        str(source_video),
+        "-map",
+        "0:v:0",
+        "-map",
+        "1:a:0?",
+        "-c:v",
+        "copy",
+        "-c:a",
+        "aac",
+        "-shortest",
+        str(output_path),
+    ]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0 or not output_path.exists():
+        _replace_file(silent_video, output_path)
+        return {
+            "status": "mux_failed",
+            "preserved": False,
+            "message": "ffmpeg could not mux source audio; wrote the overlay video without audio.",
+        }
+
+    try:
+        silent_video.unlink()
+    except FileNotFoundError:
+        pass
+
+    preserved = _has_audio(output_path)
+    message = (
+        "Source audio was muxed into the overlay video."
+        if preserved
+        else "No readable source audio stream was found; wrote the overlay video without audio."
+    )
+    return {
+        "status": "completed",
+        "preserved": preserved,
+        "message": message,
     }
 
 
@@ -139,6 +239,42 @@ def write_video_from_images(
         "size": [width, height],
         "codec": chosen_codec,
     }
+
+
+def verify_video(path: str | Path) -> None:
+    """Raise when a written video cannot be read back."""
+    _verify_video(Path(path))
+
+
+def _replace_file(source: Path, target: Path) -> None:
+    if source.resolve() == target.resolve():
+        return
+    if target.exists():
+        target.unlink()
+    source.replace(target)
+
+
+def _has_audio(video_path: Path) -> bool | None:
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe is None:
+        return None
+
+    command = [
+        ffprobe,
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "csv=p=0",
+        str(video_path),
+    ]
+    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if result.returncode != 0:
+        return None
+    return "audio" in result.stdout.lower()
 
 
 def _default_codec(output_path: Path) -> str:

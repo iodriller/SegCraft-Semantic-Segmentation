@@ -45,6 +45,10 @@ train:
   optimizer: adam
   learning_rate: 0.0003
   loss: auto
+  scheduler: none
+  amp: false
+  resume_from:
+  early_stopping_patience:
 
 eval:
   metrics: []
@@ -57,6 +61,7 @@ predict:
   save_video: true
   video_fps: 6
   video_path:
+  preserve_audio: true
 
 runtime:
   seed: 42

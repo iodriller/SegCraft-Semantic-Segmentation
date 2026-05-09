@@ -20,11 +20,24 @@ def test_parse_config_returns_typed_sections():
     assert config.data.image_size == (128, 96)
     assert config.model.backend == "auto"
     assert config.train.loss == "auto"
+    assert config.train.scheduler == "none"
+    assert config.train.amp is False
+    assert config.predict.preserve_audio is True
 
 
 def test_parse_config_rejects_invalid_overlay_alpha():
     cfg = base_config()
     cfg["predict"]["overlay_alpha"] = 1.5
+    try:
+        parse_config(cfg)
+        assert False, "expected ConfigValidationError"
+    except ConfigValidationError:
+        assert True
+
+
+def test_parse_config_rejects_invalid_scheduler():
+    cfg = base_config()
+    cfg["train"]["scheduler"] = "sometimes"
     try:
         parse_config(cfg)
         assert False, "expected ConfigValidationError"

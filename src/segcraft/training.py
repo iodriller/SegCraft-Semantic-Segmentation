@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from contextlib import nullcontext
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,15 +25,39 @@ def run_training(config: SegCraftConfig) -> dict[str, Any]:
     val_loader = _loader(config, "val", shuffle=False) if _split_ready(config, "val") else None
     model = create_model(config.model, config.task).to(device)
     optimizer = _optimizer(model, config, torch)
+    scheduler = _scheduler(optimizer, config, torch)
     criterion = _loss(config, torch)
+    amp_enabled = bool(config.train.amp and device.type == "cuda")
+    scaler = _grad_scaler(torch, amp_enabled)
 
     history = []
-    best_score = -1.0
+    best_score = float("-inf")
+    start_epoch = 1
     checkpoint_dir = Path(config.runtime.output_dir) / "checkpoints"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     best_checkpoint = checkpoint_dir / "best.pt"
+    last_checkpoint = checkpoint_dir / "last.pt"
+    history_path = Path(config.runtime.output_dir) / "training_history.json"
+    summary_path = Path(config.runtime.output_dir) / "training_summary.json"
 
-    for epoch in range(1, config.train.epochs + 1):
+    if config.train.resume_from:
+        resume_state = _load_checkpoint(
+            config.train.resume_from,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            scaler=scaler,
+            device=device,
+            torch=torch,
+        )
+        start_epoch = int(resume_state.get("epoch", 0)) + 1
+        best_score = float(resume_state.get("best_score", resume_state.get("score", best_score)))
+        history = list(resume_state.get("history", []))
+
+    stopped_early = False
+    stale_epochs = 0
+
+    for epoch in range(start_epoch, config.train.epochs + 1):
         model.train()
         total_loss = 0.0
         samples = 0
@@ -38,10 +65,16 @@ def run_training(config: SegCraftConfig) -> dict[str, Any]:
             images = batch["image"].to(device)
             masks = batch["mask"].to(device)
             optimizer.zero_grad(set_to_none=True)
-            logits = _model_output(model(images))
-            loss = criterion(logits, masks)
-            loss.backward()
-            optimizer.step()
+            with _autocast(torch, device, amp_enabled):
+                logits = _model_output(model(images))
+                loss = criterion(logits, masks)
+            if amp_enabled:
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                optimizer.step()
             batch_size = images.shape[0]
             total_loss += float(loss.detach().cpu()) * batch_size
             samples += batch_size
@@ -55,29 +88,71 @@ def run_training(config: SegCraftConfig) -> dict[str, Any]:
             score = float(epoch_summary.get("miou", epoch_summary.get("iou", 0.0)))
         else:
             score = -epoch_summary["train_loss"]
-
-        if score > best_score:
-            best_score = score
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "config": config.to_dict(),
-                    "epoch": epoch,
-                    "score": score,
-                },
-                best_checkpoint,
-            )
+        epoch_summary["learning_rate"] = _current_learning_rate(optimizer)
         history.append(epoch_summary)
 
-    return {
+        improved = score > best_score
+        if improved:
+            best_score = score
+            stale_epochs = 0
+            torch.save(
+                _checkpoint_payload(
+                    model=model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    scaler=scaler,
+                    config=config,
+                    epoch=epoch,
+                    score=score,
+                    best_score=best_score,
+                    history=history,
+                ),
+                best_checkpoint,
+            )
+        else:
+            stale_epochs += 1
+
+        _step_scheduler(scheduler, score)
+        torch.save(
+            _checkpoint_payload(
+                model=model,
+                optimizer=optimizer,
+                scheduler=scheduler,
+                scaler=scaler,
+                config=config,
+                epoch=epoch,
+                score=score,
+                best_score=best_score,
+                history=history,
+            ),
+            last_checkpoint,
+        )
+        _write_json(history_path, history)
+
+        patience = config.train.early_stopping_patience
+        if patience is not None and stale_epochs > patience:
+            stopped_early = True
+            break
+
+    summary = {
         "status": "completed",
         "device": str(device),
-        "epochs_completed": config.train.epochs,
+        "epochs_completed": len(history),
+        "last_epoch": history[-1]["epoch"] if history else start_epoch - 1,
         "train_batches": len(train_loader),
         "val_batches": len(val_loader) if val_loader is not None else 0,
         "best_checkpoint": str(best_checkpoint),
+        "last_checkpoint": str(last_checkpoint),
+        "history_path": str(history_path),
+        "summary_path": str(summary_path),
+        "scheduler": config.train.scheduler,
+        "amp_enabled": amp_enabled,
+        "resumed_from": config.train.resume_from,
+        "stopped_early": stopped_early,
         "history": history,
     }
+    _write_json(summary_path, summary)
+    return summary
 
 
 def run_evaluation(config: SegCraftConfig) -> dict[str, Any]:
@@ -96,13 +171,17 @@ def run_evaluation(config: SegCraftConfig) -> dict[str, Any]:
         model.load_state_dict(payload["model_state_dict"])
 
     metrics = _evaluate_loader(model, loader, config, device, torch)
-    return {
+    summary = {
         "status": "completed",
         "device": str(device),
         "batches": len(loader),
         "checkpoint": str(checkpoint) if checkpoint.exists() else None,
         "metrics": metrics,
     }
+    summary_path = Path(config.runtime.output_dir) / "evaluation_summary.json"
+    summary["summary_path"] = str(summary_path)
+    _write_json(summary_path, summary)
+    return summary
 
 
 def _loader(config: SegCraftConfig, split: str, *, shuffle: bool) -> Any:
@@ -210,6 +289,106 @@ def _optimizer(model: Any, config: SegCraftConfig, torch: Any) -> Any:
     raise ValueError("train.optimizer must be one of: adam, adamw, sgd")
 
 
+def _scheduler(optimizer: Any, config: SegCraftConfig, torch: Any) -> Any | None:
+    name = config.train.scheduler.lower()
+    if name == "none":
+        return None
+    if name == "cosine":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=max(config.train.epochs, 1),
+        )
+    if name == "step":
+        return torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=max(config.train.epochs // 3, 1),
+            gamma=0.1,
+        )
+    raise ValueError("train.scheduler must be one of: none, cosine, step")
+
+
+def _step_scheduler(scheduler: Any | None, score: float) -> None:
+    if scheduler is None:
+        return
+    try:
+        scheduler.step()
+    except TypeError:
+        scheduler.step(score)
+
+
+def _current_learning_rate(optimizer: Any) -> float:
+    return float(optimizer.param_groups[0]["lr"])
+
+
+def _grad_scaler(torch: Any, enabled: bool) -> Any | None:
+    if not enabled:
+        return None
+    if hasattr(torch, "amp") and hasattr(torch.amp, "GradScaler"):
+        return torch.amp.GradScaler("cuda", enabled=True)
+    return torch.cuda.amp.GradScaler(enabled=True)
+
+
+def _autocast(torch: Any, device: Any, enabled: bool) -> Any:
+    if not enabled:
+        return nullcontext()
+    if hasattr(torch, "amp") and hasattr(torch.amp, "autocast"):
+        return torch.amp.autocast(device_type=device.type, enabled=True)
+    return torch.cuda.amp.autocast(enabled=True)
+
+
+def _checkpoint_payload(
+    *,
+    model: Any,
+    optimizer: Any,
+    scheduler: Any | None,
+    scaler: Any | None,
+    config: SegCraftConfig,
+    epoch: int,
+    score: float,
+    best_score: float,
+    history: list[dict[str, Any]],
+) -> dict[str, Any]:
+    payload = {
+        "model_state_dict": model.state_dict(),
+        "optimizer_state_dict": optimizer.state_dict(),
+        "config": config.to_dict(),
+        "epoch": epoch,
+        "score": score,
+        "best_score": best_score,
+        "history": history,
+        "saved_at_utc": datetime.now(timezone.utc).isoformat(),
+    }
+    if scheduler is not None:
+        payload["scheduler_state_dict"] = scheduler.state_dict()
+    if scaler is not None:
+        payload["scaler_state_dict"] = scaler.state_dict()
+    return payload
+
+
+def _load_checkpoint(
+    path: str,
+    *,
+    model: Any,
+    optimizer: Any,
+    scheduler: Any | None,
+    scaler: Any | None,
+    device: Any,
+    torch: Any,
+) -> dict[str, Any]:
+    checkpoint = Path(path)
+    if not checkpoint.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint}")
+    payload = torch.load(checkpoint, map_location=device)
+    model.load_state_dict(payload["model_state_dict"])
+    if "optimizer_state_dict" in payload:
+        optimizer.load_state_dict(payload["optimizer_state_dict"])
+    if scheduler is not None and "scheduler_state_dict" in payload:
+        scheduler.load_state_dict(payload["scheduler_state_dict"])
+    if scaler is not None and "scaler_state_dict" in payload:
+        scaler.load_state_dict(payload["scaler_state_dict"])
+    return payload
+
+
 def _predictions(logits: Any, config: SegCraftConfig, torch: Any) -> Any:
     if config.task.type == "binary":
         return (torch.sigmoid(logits[:, 0]) > 0.5).long()
@@ -302,6 +481,11 @@ def _set_seed(seed: int, torch: Any) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def _torch() -> Any:

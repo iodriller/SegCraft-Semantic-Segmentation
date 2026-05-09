@@ -16,6 +16,7 @@ def base_config(task_type="multiclass", num_classes=3):
 def test_train_auto_loss_multiclass():
     summary = train(base_config())
     assert summary["train"]["loss"] == "cross_entropy_dice"
+    assert summary["train"]["scheduler"] == "none"
     assert summary["train"]["status"] == "data_missing"
 
 

@@ -206,14 +206,38 @@ class TrainConfig:
     optimizer: str
     learning_rate: float
     loss: str = "auto"
+    scheduler: str = "none"
+    amp: bool = False
+    resume_from: str | None = None
+    early_stopping_patience: int | None = None
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "TrainConfig":
+        scheduler = _as_string("train", "scheduler", data.get("scheduler", "none")).lower()
+        if scheduler not in {"none", "cosine", "step"}:
+            raise ConfigValidationError("train.scheduler must be one of: none, cosine, step")
+
+        amp = data.get("amp", False)
+        if not isinstance(amp, bool):
+            raise ConfigValidationError("train.amp must be true or false")
+
+        resume_from = data.get("resume_from")
+        if resume_from is not None:
+            resume_from = _as_string("train", "resume_from", resume_from)
+
+        patience = data.get("early_stopping_patience")
+        if patience is not None:
+            patience = _as_nonnegative_int("train", "early_stopping_patience", patience)
+
         return cls(
             epochs=_as_positive_int("train", "epochs", data.get("epochs")),
             optimizer=_as_string("train", "optimizer", data.get("optimizer")),
             learning_rate=_as_positive_float("train", "learning_rate", data.get("learning_rate")),
             loss=_as_string("train", "loss", data.get("loss", "auto")),
+            scheduler=scheduler,
+            amp=amp,
+            resume_from=resume_from,
+            early_stopping_patience=patience,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -222,6 +246,10 @@ class TrainConfig:
             "optimizer": self.optimizer,
             "learning_rate": self.learning_rate,
             "loss": self.loss,
+            "scheduler": self.scheduler,
+            "amp": self.amp,
+            "resume_from": self.resume_from,
+            "early_stopping_patience": self.early_stopping_patience,
         }
 
 
@@ -246,6 +274,7 @@ class PredictConfig:
     save_video: bool = True
     video_fps: float = 6.0
     video_path: str | None = None
+    preserve_audio: bool = True
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "PredictConfig":
@@ -262,6 +291,9 @@ class PredictConfig:
         video_path = data.get("video_path")
         if video_path is not None:
             video_path = _as_string("predict", "video_path", video_path)
+        preserve_audio = data.get("preserve_audio", True)
+        if not isinstance(preserve_audio, bool):
+            raise ConfigValidationError("predict.preserve_audio must be true or false")
 
         return cls(
             input_path=_as_string("predict", "input_path", data.get("input_path")),
@@ -271,6 +303,7 @@ class PredictConfig:
             save_video=save_video,
             video_fps=video_fps,
             video_path=video_path,
+            preserve_audio=preserve_audio,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -282,6 +315,7 @@ class PredictConfig:
             "save_video": self.save_video,
             "video_fps": self.video_fps,
             "video_path": self.video_path,
+            "preserve_audio": self.preserve_audio,
         }
 
 

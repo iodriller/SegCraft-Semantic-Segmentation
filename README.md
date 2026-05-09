@@ -5,7 +5,7 @@ simple: keep experiments readable, move project choices into YAML, and expose a
 Python API that notebooks and scripts can share.
 
 The current package supports typed configuration, paired image/mask datasets,
-model selection, supervised train/evaluate loops, image-folder prediction,
+model selection, supervised train/evaluate loops, image/video prediction,
 small video helpers, CLI entry points, and tests.
 
 ## Install
@@ -38,17 +38,19 @@ Validate a config:
 segcraft validate --config configs/base.yaml
 ```
 
-Run prediction on an image folder:
+Run prediction on an image folder or a video file:
 
 ```bash
 segcraft predict --config configs/base.yaml --local configs/local.yaml
 ```
 
-`configs/local.yaml` should point `predict.input_path` at your images and
-`predict.output_path` at the folder where masks and overlays should be saved.
+`configs/local.yaml` should point `predict.input_path` at your images or video
+and `predict.output_path` at the folder where outputs should be saved.
 
 Train/evaluate use the paired image and mask paths from the config. If those
 paths do not exist yet, the commands return a clear `data_missing` summary.
+Training writes `checkpoints/best.pt`, `checkpoints/last.pt`, and compact JSON
+history files under `runtime.output_dir`.
 
 ```bash
 segcraft train --config configs/base.yaml --preset configs/presets/fast_dev.yaml
@@ -63,20 +65,20 @@ Install the extras used by the demo:
 pip install -e ".[torch,video]"
 ```
 
-Prepare a short video clip:
+Prepare a video. On CPU, start with a short clip:
 
 ```python
 from pathlib import Path
-from segcraft.video import download_youtube, extract_frames
+from segcraft.video import download_youtube
 
 url = "https://www.youtube.com/watch?v=BHYOo3JCuvk"
 video_path = download_youtube(url, "data/demo/video.mp4")
-extract_frames(video_path, "data/demo/frames", every_seconds=1.0, max_frames=10)
 
 Path("configs/local.yaml").write_text(
     "predict:\n"
-    "  input_path: data/demo/frames\n"
+    "  input_path: data/demo/video.mp4\n"
     "  output_path: outputs/demo_predictions\n"
+    "  preserve_audio: true\n"
     "runtime:\n"
     "  output_dir: outputs/demo\n",
     encoding="utf-8",
@@ -89,19 +91,15 @@ Run prediction:
 segcraft predict --config configs/base.yaml --preset configs/presets/fast_dev.yaml --local configs/local.yaml
 ```
 
-The command writes indexed mask PNGs under `outputs/demo_predictions/masks` and
-overlay JPGs under `outputs/demo_predictions/overlays`. It also writes an
-annotated overlay video to `outputs/demo_predictions/overlay.mp4` when
-`predict.save_video` is enabled. A `summary.json` file records per-frame output
-paths and the classes found in each frame.
+For video input, the command writes a new annotated overlay video to
+`outputs/demo_predictions/overlay.mp4` at the source FPS. If `ffmpeg` is
+available and `predict.preserve_audio` is enabled, source audio is copied into
+the overlay video. `summary.json` records frame counts, video metadata, class
+coverage, and mean/max confidence for visible classes.
 
-To stitch the overlays back into a quick MP4:
-
-```python
-from segcraft.video import write_video_from_images
-
-write_video_from_images("outputs/demo_predictions/overlays", "outputs/demo_predictions/overlay.mp4", fps=4)
-```
+For image-folder input, SegCraft writes indexed mask PNGs under `masks/`,
+overlay JPGs under `overlays/`, an optional overlay video, and the same summary
+metadata.
 
 ## Configuration
 
@@ -122,6 +120,16 @@ Merge order is:
 3. optional local config
 
 Use `configs/local.yaml` for machine-specific paths. It is ignored by git.
+
+Useful training controls live in the same `train` section:
+
+```yaml
+train:
+  scheduler: cosine        # none, cosine, or step
+  amp: true                # enabled only when running on CUDA
+  resume_from: outputs/checkpoints/last.pt
+  early_stopping_patience: 8
+```
 
 ## Python API
 

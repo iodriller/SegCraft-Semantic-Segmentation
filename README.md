@@ -75,6 +75,8 @@ url = "https://www.youtube.com/watch?v=BHYOo3JCuvk"
 video_path = download_youtube(url, "data/demo/video.mp4")
 
 Path("configs/local.yaml").write_text(
+    "data:\n"
+    "  image_size: [360, 640]\n"
     "predict:\n"
     "  input_path: data/demo/video.mp4\n"
     "  output_path: outputs/demo_predictions\n"
@@ -100,6 +102,9 @@ coverage, and mean/max confidence for visible classes.
 For image-folder input, SegCraft writes indexed mask PNGs under `masks/`,
 overlay JPGs under `overlays/`, an optional overlay video, and the same summary
 metadata.
+
+For video demos, keep `data.image_size` close to the source aspect ratio. The
+example above uses `[360, 640]` for a 16:9 clip.
 
 ## Configuration
 

@@ -4,6 +4,8 @@ data:
   train_masks: /absolute/path/to/train/masks
   val_images: /absolute/path/to/val/images
   val_masks: /absolute/path/to/val/masks
+  # For 16:9 video prediction, a size like [360, 640] avoids square-frame distortion.
+  image_size: [512, 512]
   # Set this to "_mask" if masks are named image_001_mask.png for image_001.jpg.
   mask_suffix: ""
 predict:

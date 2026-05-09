@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Direct video prediction that writes annotated overlay MP4 files from video input.
+- Per-class confidence metadata in prediction overlays and `summary.json`.
+- Minimal training controls for schedulers, AMP, checkpoint resume, early stopping, and JSON run summaries.
+
+### Changed
+- Video examples now use a 16:9 prediction size to avoid square-frame distortion.
+
 ## [0.1.0] - 2026-05-02
 
 ### Added

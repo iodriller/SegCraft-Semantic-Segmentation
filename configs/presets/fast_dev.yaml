@@ -1,5 +1,3 @@
-# Use with: segcraft --config configs/base.yaml
-# Then manually copy overrides or future merge utility.
 train:
   epochs: 1
 data:

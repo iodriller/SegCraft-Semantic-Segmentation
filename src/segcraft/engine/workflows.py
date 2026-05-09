@@ -1,13 +1,13 @@
-"""Train/Eval/Predict workflow scaffolding.
-
-This is intentionally backend-agnostic and returns structured run summaries.
-"""
+"""Train/Eval/Predict workflow entry points."""
 
 from datetime import datetime, timezone
-from typing import Any, Dict
+from pathlib import Path
+from typing import Any, Mapping
 
+from segcraft.config import SegCraftConfig, parse_config
 from segcraft.metrics import resolve_metrics
 from segcraft.models import build_model
+from segcraft.prediction import run_prediction
 
 
 LOSS_BY_TASK = {
@@ -16,48 +16,56 @@ LOSS_BY_TASK = {
 }
 
 
-def _resolve_loss(task_cfg: Dict[str, Any], train_cfg: Dict[str, Any]) -> str:
-    chosen = train_cfg.get("loss")
+def _resolve_loss(config: SegCraftConfig) -> str:
+    chosen = config.train.loss
     if chosen and str(chosen).lower() != "auto":
         return str(chosen)
-    return LOSS_BY_TASK[task_cfg["type"]]
+    return LOSS_BY_TASK[config.task.type]
 
 
-def _common_summary(mode: str, config: Dict[str, Any]) -> Dict[str, Any]:
-    task = config["task"]
-    model = build_model(config["model"], task)
-    metrics = resolve_metrics(task, config["eval"])
-    return {
+def _common_summary(
+    mode: str, config: Mapping[str, Any] | SegCraftConfig
+) -> tuple[SegCraftConfig, dict[str, Any]]:
+    cfg = parse_config(config)
+    model = build_model(cfg.model, cfg.task)
+    metrics = resolve_metrics(cfg.task.to_dict(), cfg.eval.to_dict())
+    return cfg, {
         "mode": mode,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-        "task": task,
+        "task": cfg.task.to_dict(),
         "model": model,
         "metrics": metrics,
     }
 
 
-def train(config: Dict[str, Any]) -> Dict[str, Any]:
-    summary = _common_summary("train", config)
+def train(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
+    cfg, summary = _common_summary("train", config)
     summary["train"] = {
-        "epochs": config["train"]["epochs"],
-        "optimizer": config["train"]["optimizer"],
-        "learning_rate": config["train"]["learning_rate"],
-        "loss": _resolve_loss(config["task"], config["train"]),
+        "epochs": cfg.train.epochs,
+        "optimizer": cfg.train.optimizer,
+        "learning_rate": cfg.train.learning_rate,
+        "loss": _resolve_loss(cfg),
     }
     return summary
 
 
-def evaluate(config: Dict[str, Any]) -> Dict[str, Any]:
-    summary = _common_summary("evaluate", config)
+def evaluate(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
+    _, summary = _common_summary("evaluate", config)
     summary["eval"] = {"metrics": summary["metrics"]}
     return summary
 
 
-def predict(config: Dict[str, Any]) -> Dict[str, Any]:
-    summary = _common_summary("predict", config)
+def predict(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
+    cfg, summary = _common_summary("predict", config)
     summary["predict"] = {
-        "input_path": config["predict"]["input_path"],
-        "output_path": config["predict"]["output_path"],
-        "overlay_alpha": config["predict"].get("overlay_alpha", 0.5),
+        "input_path": cfg.predict.input_path,
+        "output_path": cfg.predict.output_path,
+        "overlay_alpha": cfg.predict.overlay_alpha,
     }
+    if not Path(cfg.predict.input_path).exists():
+        summary["predict"]["status"] = "input_missing"
+        summary["predict"]["message"] = f"Prediction input path does not exist: {cfg.predict.input_path}"
+        return summary
+
+    summary["predict"].update(run_prediction(cfg))
     return summary

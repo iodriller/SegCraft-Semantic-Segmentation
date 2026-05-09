@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 
-from .schema import validate_config
+from .schema import SegCraftConfig, parse_config, validate_config
 
 
 def _load_yaml(path: Path) -> Dict[str, Any]:
@@ -37,12 +37,12 @@ def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any
     return merged
 
 
-def load_and_validate_config(
+def _load_merged_config(
     config_path: str | Path,
     preset_path: str | Path | None = None,
     local_path: str | Path | None = None,
 ) -> Dict[str, Any]:
-    """Load base config, then optional preset/local overlays, then validate."""
+    """Load base config, then optional preset/local overlays."""
     config = _load_yaml(Path(config_path))
 
     if preset_path:
@@ -54,5 +54,24 @@ def load_and_validate_config(
         local_cfg = _load_yaml(Path(local_path))
         config = _deep_merge(config, local_cfg)
 
+    return config
+
+
+def load_and_validate_config(
+    config_path: str | Path,
+    preset_path: str | Path | None = None,
+    local_path: str | Path | None = None,
+) -> Dict[str, Any]:
+    """Load and validate config, returning the merged mapping."""
+    config = _load_merged_config(config_path, preset_path=preset_path, local_path=local_path)
     validate_config(config)
     return config
+
+
+def load_config_object(
+    config_path: str | Path,
+    preset_path: str | Path | None = None,
+    local_path: str | Path | None = None,
+) -> SegCraftConfig:
+    """Load and validate config, returning typed config sections."""
+    return parse_config(_load_merged_config(config_path, preset_path=preset_path, local_path=local_path))

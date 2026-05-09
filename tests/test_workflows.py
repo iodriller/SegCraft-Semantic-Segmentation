@@ -27,3 +27,9 @@ def test_predict_and_evaluate_modes():
     cfg = base_config()
     assert evaluate(cfg)["mode"] == "evaluate"
     assert predict(cfg)["mode"] == "predict"
+
+
+def test_predict_missing_input_reports_status_without_torch():
+    summary = predict(base_config())
+    assert summary["predict"]["status"] == "input_missing"
+    assert "does not exist" in summary["predict"]["message"]

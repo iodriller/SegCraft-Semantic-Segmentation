@@ -6,4 +6,5 @@ train:
   loss: auto
   epochs: 10
 model:
-  name: unet
+  name: deeplabv3_resnet50
+  backend: torchvision

@@ -1,12 +1,33 @@
 task:
   type: multiclass
-  num_classes: 3
-  class_names: [background, road, person]
+  num_classes: 21
+  class_names:
+    - background
+    - aeroplane
+    - bicycle
+    - bird
+    - boat
+    - bottle
+    - bus
+    - car
+    - cat
+    - chair
+    - cow
+    - diningtable
+    - dog
+    - horse
+    - motorbike
+    - person
+    - pottedplant
+    - sheep
+    - sofa
+    - train
+    - tvmonitor
   ignore_index: 255
 
 model:
-  name: unet
-  encoder: resnet34
+  name: deeplabv3_resnet50
+  backend: torchvision
   pretrained: true
 
 data:
@@ -17,6 +38,7 @@ data:
   image_size: [512, 512]
   batch_size: 4
   num_workers: 4
+  mask_suffix: ""
 
 train:
   epochs: 20

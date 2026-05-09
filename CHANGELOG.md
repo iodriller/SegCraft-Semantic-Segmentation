@@ -10,6 +10,8 @@
 - Optional model factories for TorchVision and segmentation-models-pytorch.
 - Real image-folder prediction with mask and overlay outputs.
 - Automatic overlay video writing for prediction outputs.
+- Annotated prediction overlays with frame metadata and per-frame class summaries.
+- Prediction `summary.json` with per-frame artifact paths and detected classes.
 - Small video helpers for YouTube download, frame extraction, and verified video writing.
 - Minimal supervised train/evaluate loops for paired image/mask datasets.
 - CLI modes: `validate`, `train`, `evaluate`, `predict`.

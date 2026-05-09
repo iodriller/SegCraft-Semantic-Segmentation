@@ -91,8 +91,9 @@ segcraft predict --config configs/base.yaml --preset configs/presets/fast_dev.ya
 
 The command writes indexed mask PNGs under `outputs/demo_predictions/masks` and
 overlay JPGs under `outputs/demo_predictions/overlays`. It also writes an
-overlay video to `outputs/demo_predictions/overlay.mp4` when `predict.save_video`
-is enabled.
+annotated overlay video to `outputs/demo_predictions/overlay.mp4` when
+`predict.save_video` is enabled. A `summary.json` file records per-frame output
+paths and the classes found in each frame.
 
 To stitch the overlays back into a quick MP4:
 

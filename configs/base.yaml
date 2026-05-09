@@ -53,6 +53,7 @@ predict:
   input_path: data/infer/images
   output_path: outputs/predictions
   overlay_alpha: 0.5
+  annotate: true
   save_video: true
   video_fps: 6
   video_path:

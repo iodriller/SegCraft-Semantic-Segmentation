@@ -242,6 +242,7 @@ class PredictConfig:
     input_path: str
     output_path: str
     overlay_alpha: float = 0.5
+    annotate: bool = True
     save_video: bool = True
     video_fps: float = 6.0
     video_path: str | None = None
@@ -251,6 +252,9 @@ class PredictConfig:
         overlay_alpha = data.get("overlay_alpha", 0.5)
         if not isinstance(overlay_alpha, (int, float)) or not 0 <= overlay_alpha <= 1:
             raise ConfigValidationError("predict.overlay_alpha must be between 0 and 1")
+        annotate = data.get("annotate", True)
+        if not isinstance(annotate, bool):
+            raise ConfigValidationError("predict.annotate must be true or false")
         save_video = data.get("save_video", True)
         if not isinstance(save_video, bool):
             raise ConfigValidationError("predict.save_video must be true or false")
@@ -263,6 +267,7 @@ class PredictConfig:
             input_path=_as_string("predict", "input_path", data.get("input_path")),
             output_path=_as_string("predict", "output_path", data.get("output_path")),
             overlay_alpha=float(overlay_alpha),
+            annotate=annotate,
             save_video=save_video,
             video_fps=video_fps,
             video_path=video_path,
@@ -273,6 +278,7 @@ class PredictConfig:
             "input_path": self.input_path,
             "output_path": self.output_path,
             "overlay_alpha": self.overlay_alpha,
+            "annotate": self.annotate,
             "save_video": self.save_video,
             "video_fps": self.video_fps,
             "video_path": self.video_path,

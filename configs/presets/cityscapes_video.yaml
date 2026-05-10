@@ -42,12 +42,12 @@ predict:
   display:
     palette: vivid
     show_panel: true
-    show_labels: true
+    show_floating_labels: false
     show_confidence: true
     show_percentages: true
     max_classes: 8
     max_labels: 10
-    label_min_pixels: 900
-    label_move_threshold: 36
-    label_smoothing: 0.7
+    label_min_pixels: 2400
+    label_move_threshold: 96
+    label_smoothing: 0.85
     panel_position: top_right

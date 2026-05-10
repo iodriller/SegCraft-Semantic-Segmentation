@@ -83,8 +83,7 @@ def _run_image_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     overlays_dir.mkdir(parents=True, exist_ok=True)
 
     torch = _torch()
-    device = _resolve_device(cfg.runtime.device, torch)
-    model = create_model(cfg.model, cfg.task).to(device)
+    model, device, device_fallback = _create_model_on_device(cfg, torch)
     model.eval()
 
     artifacts = []
@@ -115,6 +114,7 @@ def _run_image_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         "status": "completed",
         "input_type": "images",
         "device": str(device),
+        "device_fallback": device_fallback,
         "images_found": len(image_paths),
         "images_processed": len(artifacts),
         "masks_dir": str(masks_dir),
@@ -138,8 +138,7 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     output_dir.mkdir(parents=True, exist_ok=True)
 
     torch = _torch()
-    device = _resolve_device(cfg.runtime.device, torch)
-    model = create_model(cfg.model, cfg.task).to(device)
+    model, device, device_fallback = _create_model_on_device(cfg, torch)
     model.eval()
 
     cv2 = _cv2()
@@ -296,6 +295,7 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         "status": "completed",
         "input_type": "video",
         "device": str(device),
+        "device_fallback": device_fallback,
         "source_video": video_info,
         "original_video": original_video,
         "video_sampling": {
@@ -533,7 +533,7 @@ def _annotate_overlay(
     width, height = canvas.size
 
     palette = _palette(num_classes, class_names=class_names, palette_name=display.palette)
-    if display.show_labels:
+    if display.show_floating_labels:
         _draw_region_labels(
             draw,
             classes,
@@ -825,6 +825,20 @@ def _resolve_device(requested: str, torch: Any) -> Any:
     if requested == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("runtime.device is 'cuda', but CUDA is not available")
     return torch.device(requested)
+
+
+def _create_model_on_device(cfg: SegCraftConfig, torch: Any) -> tuple[Any, Any, str | None]:
+    device = _resolve_device(cfg.runtime.device, torch)
+    try:
+        return create_model(cfg.model, cfg.task).to(device), device, None
+    except RuntimeError as exc:
+        if cfg.runtime.device == "auto" and device.type == "cuda":
+            if hasattr(torch.cuda, "empty_cache"):
+                torch.cuda.empty_cache()
+            cpu = torch.device("cpu")
+            reason = str(exc).splitlines()[0][:300]
+            return create_model(cfg.model, cfg.task).to(cpu), cpu, reason
+        raise
 
 
 def _palette(

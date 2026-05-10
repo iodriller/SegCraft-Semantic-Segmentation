@@ -291,14 +291,14 @@ class EvalConfig:
 class DisplayConfig:
     palette: str = "vivid"
     show_panel: bool = True
-    show_labels: bool = True
+    show_floating_labels: bool = False
     show_confidence: bool = True
     show_percentages: bool = True
     max_classes: int = 6
     max_labels: int = 8
-    label_min_pixels: int = 600
-    label_move_threshold: int = 36
-    label_smoothing: float = 0.7
+    label_min_pixels: int = 1200
+    label_move_threshold: int = 96
+    label_smoothing: float = 0.85
     panel_position: str = "bottom_left"
 
     @classmethod
@@ -324,7 +324,11 @@ class DisplayConfig:
         return cls(
             palette=palette,
             show_panel=_as_bool("predict.display", "show_panel", data.get("show_panel", True)),
-            show_labels=_as_bool("predict.display", "show_labels", data.get("show_labels", True)),
+            show_floating_labels=_as_bool(
+                "predict.display",
+                "show_floating_labels",
+                data.get("show_floating_labels", data.get("show_labels", False)),
+            ),
             show_confidence=_as_bool(
                 "predict.display", "show_confidence", data.get("show_confidence", True)
             ),
@@ -336,13 +340,13 @@ class DisplayConfig:
             ),
             max_labels=_as_positive_int("predict.display", "max_labels", data.get("max_labels", 8)),
             label_min_pixels=_as_nonnegative_int(
-                "predict.display", "label_min_pixels", data.get("label_min_pixels", 600)
+                "predict.display", "label_min_pixels", data.get("label_min_pixels", 1200)
             ),
             label_move_threshold=_as_nonnegative_int(
-                "predict.display", "label_move_threshold", data.get("label_move_threshold", 36)
+                "predict.display", "label_move_threshold", data.get("label_move_threshold", 96)
             ),
             label_smoothing=_as_probability_float(
-                "predict.display", "label_smoothing", data.get("label_smoothing", 0.7)
+                "predict.display", "label_smoothing", data.get("label_smoothing", 0.85)
             ),
             panel_position=panel_position,
         )
@@ -351,7 +355,7 @@ class DisplayConfig:
         return {
             "palette": self.palette,
             "show_panel": self.show_panel,
-            "show_labels": self.show_labels,
+            "show_floating_labels": self.show_floating_labels,
             "show_confidence": self.show_confidence,
             "show_percentages": self.show_percentages,
             "max_classes": self.max_classes,
@@ -361,6 +365,10 @@ class DisplayConfig:
             "label_smoothing": self.label_smoothing,
             "panel_position": self.panel_position,
         }
+
+    @property
+    def show_labels(self) -> bool:
+        return self.show_floating_labels
 
 
 @dataclass(frozen=True)

@@ -27,8 +27,10 @@ def test_parse_config_returns_typed_sections():
     assert config.predict.video_max_seconds is None
     assert config.predict.video_frame_stride == 1
     assert config.predict.display.palette == "vivid"
-    assert config.predict.display.label_move_threshold == 36
-    assert config.predict.display.label_smoothing == 0.7
+    assert config.predict.display.show_floating_labels is False
+    assert config.predict.display.show_labels is False
+    assert config.predict.display.label_move_threshold == 96
+    assert config.predict.display.label_smoothing == 0.85
 
 
 def test_parse_config_rejects_invalid_overlay_alpha():
@@ -75,3 +77,10 @@ def test_parse_config_accepts_video_sampling_controls():
     assert parsed.predict.video_frame_stride == 3
     assert parsed.predict.display.label_move_threshold == 48
     assert parsed.predict.display.label_smoothing == 0.8
+
+
+def test_parse_config_accepts_old_show_labels_key():
+    cfg = base_config()
+    cfg["predict"]["display"] = {"show_labels": True}
+    parsed = parse_config(cfg)
+    assert parsed.predict.display.show_floating_labels is True

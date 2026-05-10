@@ -68,14 +68,14 @@ predict:
   display:
     palette: vivid
     show_panel: true
-    show_labels: true
+    show_floating_labels: false
     show_confidence: true
     show_percentages: true
     max_classes: 6
     max_labels: 8
-    label_min_pixels: 600
-    label_move_threshold: 36
-    label_smoothing: 0.7
+    label_min_pixels: 1200
+    label_move_threshold: 96
+    label_smoothing: 0.85
     panel_position: bottom_left
 
 runtime:

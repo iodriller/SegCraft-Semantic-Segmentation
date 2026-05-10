@@ -9,6 +9,7 @@
 - Configurable overlay display controls for panels, region labels, confidence, percentages, and palette.
 - Video sampling controls for first-N-seconds prediction and frame stride.
 - Stabilized video label placement to reduce frame-to-frame jitter.
+- Explicit floating-label toggle and concise GPU setup notes.
 - Per-class confidence metadata in prediction overlays and `summary.json`.
 - Minimal training controls for schedulers, AMP, checkpoint resume, early stopping, and JSON run summaries.
 

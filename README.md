@@ -31,6 +31,14 @@ pip install -e ".[video]"       # YouTube download/frame/video helpers
 pip install -e ".[dev]"         # test runner
 ```
 
+For NVIDIA GPUs, install a CUDA-enabled PyTorch wheel after the editable
+install. Check the current command on the [PyTorch install page](https://pytorch.org/get-started/locally/);
+for CUDA 12.8 it looks like:
+
+```bash
+pip install --upgrade torch torchvision --index-url https://download.pytorch.org/whl/cu128
+```
+
 ## Quick Start
 
 Validate a config:
@@ -85,6 +93,7 @@ Path("configs/local.yaml").write_text(
     "  video_frame_stride: 1\n"
     "  preserve_audio: true\n"
     "runtime:\n"
+    "  device: auto\n"
     "  output_dir: outputs/demo\n",
     encoding="utf-8",
 )
@@ -125,6 +134,18 @@ Direct video prediction preserves the source FPS when `video_frame_stride` is
 `1`. If you increase the stride, SegCraft lowers the output FPS so the processed
 video keeps the same real-time pace instead of speeding up.
 
+Runtime device selection lives under `runtime`:
+
+```yaml
+runtime:
+  device: auto  # auto, cuda, or cpu
+```
+
+`auto` uses CUDA when the installed PyTorch build can see a GPU, otherwise it
+uses CPU. Prediction also records `device_fallback` in `summary.json` if model
+startup falls back from CUDA to CPU. Use `cuda` when you want a hard failure if
+GPU is not available.
+
 Display controls live under `predict.display`:
 
 ```yaml
@@ -132,14 +153,14 @@ predict:
   display:
     palette: vivid           # vivid or pascal
     show_panel: true
-    show_labels: true        # labels near large predicted regions
+    show_floating_labels: false # turn on labels near large predicted regions
     show_confidence: true
     show_percentages: true
     max_classes: 8
     max_labels: 10
-    label_min_pixels: 900
-    label_move_threshold: 36 # pixels; ignore smaller label movements frame to frame
-    label_smoothing: 0.7     # 0 disables smoothing, higher values move labels more slowly
+    label_min_pixels: 2400   # ignore tiny regions when floating labels are enabled
+    label_move_threshold: 96 # pixels; ignore smaller label movements frame to frame
+    label_smoothing: 0.85    # 0 disables smoothing, higher values move labels more slowly
     panel_position: top_right
 ```
 

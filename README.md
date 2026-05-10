@@ -318,3 +318,7 @@ Build and check release artifacts:
 python -m build
 twine check dist/*
 ```
+
+Publishing to PyPI/TestPyPI uses `.github/workflows/release.yml` through
+GitHub trusted publishing. Configure the PyPI project publisher for the
+`pypi` or `testpypi` environment, then run the release workflow manually.

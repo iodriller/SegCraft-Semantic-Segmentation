@@ -18,3 +18,30 @@ jobs:
           pip install -e ".[dev]"
       - name: Run tests
         run: pytest
+
+  optional-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: torch
+            extras: torch
+            command: pytest tests/test_prediction_real.py
+          - name: video
+            extras: video
+            command: python -c "import cv2, yt_dlp; import segcraft.video"
+          - name: app
+            extras: app
+            command: python -c "from segcraft.webapp import create_app; app = create_app(); print(app.title)"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install ${{ matrix.name }} extras
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,${{ matrix.extras }}]"
+      - name: Smoke ${{ matrix.name }}
+        run: ${{ matrix.command }}

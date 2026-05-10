@@ -1,5 +1,5 @@
 """Prediction helpers for SegCraft."""
 
-from .predictor import run_prediction
+from .predictor import ProgressCallback, run_prediction
 
-__all__ = ["run_prediction"]
+__all__ = ["ProgressCallback", "run_prediction"]

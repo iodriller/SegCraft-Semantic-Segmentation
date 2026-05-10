@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Added
+- Optional FastAPI web app for video upload, YouTube input, progress, and output downloads.
+- Prediction progress callback support.
+- Optional-extra smoke CI and release publishing workflow.
+- Real image prediction test using a dummy model when PyTorch is installed.
 - Release metadata for PyPI packaging.
 - Lightweight API notebook for config loading, model specs, and dataset pairing.
 - Packaged CLI base config so `segcraft validate` works after wheel install.
@@ -39,8 +43,6 @@
 - Example notebook: `notebooks/01_quickstart.ipynb`.
 - Tests for schema, merge semantics, and workflow summaries.
 - CI workflow to run pytest.
-- Migration guide from legacy scripts.
 
 ### Changed
-- Legacy script workflow moved to `legacy/`.
 - README rewritten around package-first usage.

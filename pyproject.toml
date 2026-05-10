@@ -28,10 +28,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/iodriller/Semantic-Segmentation"
-Repository = "https://github.com/iodriller/Semantic-Segmentation"
-Issues = "https://github.com/iodriller/Semantic-Segmentation/issues"
-Changelog = "https://github.com/iodriller/Semantic-Segmentation/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/iodriller/SegCraft-Semantic-Segmentation"
+Repository = "https://github.com/iodriller/SegCraft-Semantic-Segmentation"
+Issues = "https://github.com/iodriller/SegCraft-Semantic-Segmentation/issues"
+Changelog = "https://github.com/iodriller/SegCraft-Semantic-Segmentation/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 torch = [
@@ -50,6 +50,11 @@ video = [
   "opencv-python>=4.8",
   "yt-dlp>=2024.1",
 ]
+app = [
+  "fastapi>=0.115",
+  "python-multipart>=0.0.9",
+  "uvicorn[standard]>=0.30",
+]
 dev = [
   "pytest>=8.0",
   "build>=1.2",
@@ -58,6 +63,7 @@ dev = [
 
 [project.scripts]
 segcraft = "segcraft.cli.main:main"
+segcraft-web = "segcraft.webapp:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

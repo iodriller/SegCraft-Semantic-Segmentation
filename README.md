@@ -21,7 +21,7 @@ pip install segcraft
 Install directly from GitHub today:
 
 ```bash
-pip install "segcraft @ git+https://github.com/iodriller/Semantic-Segmentation.git"
+pip install "segcraft @ git+https://github.com/iodriller/SegCraft-Semantic-Segmentation.git"
 ```
 
 Local development install:
@@ -42,6 +42,7 @@ Optional extras:
 pip install -e ".[torch,smp]"   # Unet, FPN, Linknet, PSPNet via segmentation-models-pytorch
 pip install -e ".[torch,transformers]"  # Hugging Face semantic segmentation models
 pip install -e ".[video]"       # YouTube download/frame/video helpers
+pip install -e ".[app]"         # FastAPI demo app
 pip install -e ".[dev]"         # test runner
 ```
 
@@ -72,6 +73,17 @@ segcraft predict --config configs/base.yaml --local configs/local.yaml
 
 `configs/local.yaml` should point `predict.input_path` at your images or video
 and `predict.output_path` at the folder where outputs should be saved.
+
+Launch the optional web UI:
+
+```bash
+pip install -e ".[torch,video,app]"
+segcraft-web
+```
+
+Open `http://127.0.0.1:8000`, upload a video or paste a YouTube URL, then
+download `comparison.mp4`, `overlay.mp4`, `original.mp4`, or `summary.json`
+when the job finishes.
 
 Train/evaluate use the paired image and mask paths from the config. If those
 paths do not exist yet, the commands return a clear `data_missing` summary.
@@ -225,6 +237,7 @@ train:
 from segcraft import load_config, load_config_object
 from segcraft.data import pair_image_masks
 from segcraft.models import build_model, create_model
+from segcraft.prediction import run_prediction
 
 config = load_config("configs/base.yaml")
 typed = load_config_object("configs/base.yaml")
@@ -239,10 +252,18 @@ model = create_model(typed.model, typed.task)
 `load_config` returns the merged dictionary for simple scripts. `load_config_object`
 returns typed config sections for library code.
 
+Prediction also accepts a lightweight progress callback:
+
+```python
+events = []
+summary = run_prediction(config, progress_callback=events.append)
+```
+
 ## Notebooks
 
 - `notebooks/01_quickstart.ipynb`: YouTube/video-to-overlay demo.
 - `notebooks/02_config_and_api.ipynb`: minimal config, dataset pairing, and model-spec API tour.
+- `notebooks/03_web_app.ipynb`: launch and use the optional FastAPI demo app.
 
 ## Supported Model Specs
 

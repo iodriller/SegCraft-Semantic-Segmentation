@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from math import hypot
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from segcraft.config import SegCraftConfig, parse_config
 from segcraft.data import list_image_files
@@ -23,6 +23,7 @@ from segcraft.video import (
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 TOTAL_KEY = -1
+ProgressCallback = Callable[[dict[str, Any]], None]
 
 CLASS_COLOR_OVERRIDES = {
     "road": (90, 80, 255),
@@ -61,20 +62,36 @@ FALLBACK_VIVID_COLORS = (
 )
 
 
-def run_prediction(config: Mapping[str, Any] | SegCraftConfig) -> dict[str, Any]:
+def run_prediction(
+    config: Mapping[str, Any] | SegCraftConfig,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> dict[str, Any]:
     cfg = parse_config(config)
     input_path = Path(cfg.predict.input_path)
     if not input_path.exists():
         raise FileNotFoundError(f"Prediction input path does not exist: {input_path}")
     if is_video_file(input_path):
-        return _run_video_prediction(cfg, input_path)
-    return _run_image_prediction(cfg, input_path)
+        return _run_video_prediction(cfg, input_path, progress_callback=progress_callback)
+    return _run_image_prediction(cfg, input_path, progress_callback=progress_callback)
 
 
-def _run_image_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, Any]:
+def _run_image_prediction(
+    cfg: SegCraftConfig,
+    input_path: Path,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> dict[str, Any]:
     image_paths = list_image_files(input_path)
     if not image_paths:
         raise ValueError(f"No images found under: {input_path}")
+    _emit_progress(
+        progress_callback,
+        stage="predicting_images",
+        completed=0,
+        total=len(image_paths),
+        message="Starting image prediction",
+    )
 
     output_dir = Path(cfg.predict.output_path)
     masks_dir = output_dir / "masks"
@@ -109,6 +126,13 @@ def _run_image_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
             )
             artifacts.append(artifact)
             _update_class_totals(class_totals, artifact["classes"], artifact["total_pixels"])
+            _emit_progress(
+                progress_callback,
+                stage="predicting_images",
+                completed=frame_index + 1,
+                total=len(image_paths),
+                message=f"Processed {image_path.name}",
+            )
 
     summary = {
         "status": "completed",
@@ -123,6 +147,13 @@ def _run_image_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         "sample_outputs": artifacts[:5],
     }
     if cfg.predict.save_video:
+        _emit_progress(
+            progress_callback,
+            stage="writing_video",
+            completed=len(artifacts),
+            total=len(image_paths),
+            message="Writing overlay video",
+        )
         video_path = _prediction_video_path(cfg, output_dir)
         summary["overlay_video"] = write_video_from_images(
             overlays_dir,
@@ -130,10 +161,22 @@ def _run_image_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
             fps=cfg.predict.video_fps,
         )
     _write_prediction_summary(output_dir, summary, outputs=artifacts)
+    _emit_progress(
+        progress_callback,
+        stage="completed",
+        completed=len(artifacts),
+        total=len(image_paths),
+        message="Prediction complete",
+    )
     return summary
 
 
-def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, Any]:
+def _run_video_prediction(
+    cfg: SegCraftConfig,
+    input_path: Path,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> dict[str, Any]:
     output_dir = Path(cfg.predict.output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -149,6 +192,10 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     max_source_frames = None
     if cfg.predict.video_max_seconds is not None:
         max_source_frames = max(1, int(round(cfg.predict.video_max_seconds * source_fps)))
+    total_source_frames = max_source_frames or int(video_info.get("frame_count") or 0)
+    total_frames = None
+    if total_source_frames > 0:
+        total_frames = max(1, (total_source_frames + frame_stride - 1) // frame_stride)
     source_width, source_height = video_info["size"]
     video_path = _prediction_video_path(cfg, output_dir)
     original_video_path = _original_video_path(input_path, output_dir)
@@ -196,6 +243,13 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     label_positions: dict[int, tuple[float, float]] = {}
     source_frame_index = 0
     frames_processed = 0
+    _emit_progress(
+        progress_callback,
+        stage="predicting_video",
+        completed=0,
+        total=total_frames,
+        message="Starting video prediction",
+    )
     try:
         with torch.inference_mode():
             while True:
@@ -248,6 +302,13 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
                     )
                 _update_class_totals(class_totals, result["classes"], result["total_pixels"])
                 frames_processed += 1
+                _emit_progress(
+                    progress_callback,
+                    stage="predicting_video",
+                    completed=frames_processed,
+                    total=total_frames,
+                    message=f"Processed frame {frames_processed}",
+                )
                 source_frame_index += 1
     finally:
         cap.release()
@@ -264,6 +325,13 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     original_video = None
     audio = {"status": "disabled", "preserved": False}
     if cfg.predict.save_video:
+        _emit_progress(
+            progress_callback,
+            stage="writing_video",
+            completed=frames_processed,
+            total=total_frames,
+            message="Finalizing video outputs",
+        )
         verify_video(original_video_path)
         original_video = probe_video(original_video_path)
         original_video["source_path"] = str(input_path)
@@ -312,6 +380,13 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         "comparison_video": comparison_video,
     }
     _write_prediction_summary(output_dir, summary, outputs=samples)
+    _emit_progress(
+        progress_callback,
+        stage="completed",
+        completed=frames_processed,
+        total=total_frames,
+        message="Prediction complete",
+    )
     return summary
 
 
@@ -817,6 +892,30 @@ def _write_prediction_summary(
     full_summary = dict(summary)
     full_summary["outputs"] = outputs
     summary_path.write_text(json.dumps(full_summary, indent=2), encoding="utf-8")
+
+
+def _emit_progress(
+    callback: ProgressCallback | None,
+    *,
+    stage: str,
+    completed: int,
+    total: int | None,
+    message: str,
+) -> None:
+    if callback is None:
+        return
+    percent = None
+    if total:
+        percent = round(min(max(completed / total, 0.0), 1.0) * 100.0, 2)
+    callback(
+        {
+            "stage": stage,
+            "completed": completed,
+            "total": total,
+            "percent": percent,
+            "message": message,
+        }
+    )
 
 
 def _resolve_device(requested: str, torch: Any) -> Any:

@@ -20,6 +20,17 @@ def test_build_model_resolves_smp_alias():
     assert spec["factory"] == "Unet"
 
 
+def test_build_model_resolves_transformers_model_id():
+    spec = build_model(
+        {"name": "nvidia/segformer-b0-finetuned-cityscapes-1024-1024", "backend": "auto"},
+        {"type": "multiclass", "num_classes": 19},
+    )
+
+    assert spec["backend"] == "transformers"
+    assert spec["factory"] == "nvidia/segformer-b0-finetuned-cityscapes-1024-1024"
+    assert spec["num_classes"] == 19
+
+
 def test_build_model_rejects_wrong_backend():
     try:
         build_model({"name": "unet", "backend": "torchvision"}, task_config())

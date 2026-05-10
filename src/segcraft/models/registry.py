@@ -67,6 +67,8 @@ def create_model(model_config: ModelConfig | Mapping[str, Any], task_config: Tas
         return _create_torchvision_model(spec)
     if spec["backend"] == "smp":
         return _create_smp_model(spec)
+    if spec["backend"] == "transformers":
+        return _create_transformers_model(spec)
     raise ValueError(f"Unsupported model backend: {spec['backend']}")
 
 
@@ -89,6 +91,8 @@ def _resolve_backend(configured_backend: str, name: str) -> str:
         return "torchvision"
     if name in SMP_ALIASES:
         return "smp"
+    if "/" in name:
+        return "transformers"
     _raise_unsupported_model(name)
 
 
@@ -97,11 +101,13 @@ def _resolve_factory(backend: str, name: str) -> str:
         return TORCHVISION_ALIASES[name]
     if backend == "smp" and name in SMP_ALIASES:
         return SMP_ALIASES[name]
+    if backend == "transformers":
+        return name
     _raise_unsupported_model(name, backend=backend)
 
 
 def _raise_unsupported_model(name: str, backend: str | None = None) -> None:
-    supported = ", ".join(sorted(SUPPORTED_MODELS))
+    supported = ", ".join(sorted(SUPPORTED_MODELS)) + ", or a Hugging Face model id"
     backend_text = f" for backend '{backend}'" if backend else ""
     raise ValueError(f"Unsupported model '{name}'{backend_text}. Supported models: {supported}")
 
@@ -172,3 +178,47 @@ def _create_smp_model(spec: Mapping[str, Any]) -> Any:
         in_channels=3,
         classes=spec["num_classes"],
     )
+
+
+def _create_transformers_model(spec: Mapping[str, Any]) -> Any:
+    try:
+        import torch
+        import torch.nn.functional as functional
+        from transformers import AutoConfig, AutoModelForSemanticSegmentation
+    except ModuleNotFoundError as exc:
+        raise ModuleNotFoundError(
+            "Transformers models require optional dependencies. "
+            "Install with `pip install -e .[transformers]`."
+        ) from exc
+
+    model_name = spec["factory"]
+    if spec["pretrained"]:
+        model = AutoModelForSemanticSegmentation.from_pretrained(model_name)
+    else:
+        model = AutoModelForSemanticSegmentation.from_config(AutoConfig.from_pretrained(model_name))
+
+    num_labels = int(getattr(model.config, "num_labels", spec["num_classes"]))
+    if num_labels != spec["num_classes"]:
+        raise ValueError(
+            f"Model '{model_name}' has {num_labels} labels, but task.num_classes is "
+            f"{spec['num_classes']}"
+        )
+
+    class TransformersSegmentationWrapper(torch.nn.Module):
+        def __init__(self, wrapped_model: Any) -> None:
+            super().__init__()
+            self.model = wrapped_model
+
+        def forward(self, pixel_values: Any) -> dict[str, Any]:
+            output = self.model(pixel_values=pixel_values)
+            logits = output.logits
+            if logits.shape[-2:] != pixel_values.shape[-2:]:
+                logits = functional.interpolate(
+                    logits,
+                    size=pixel_values.shape[-2:],
+                    mode="bilinear",
+                    align_corners=False,
+                )
+            return {"out": logits}
+
+    return TransformersSegmentationWrapper(model)

@@ -1,0 +1,48 @@
+task:
+  type: multiclass
+  num_classes: 19
+  class_names:
+    - road
+    - sidewalk
+    - building
+    - wall
+    - fence
+    - pole
+    - traffic_light
+    - traffic_sign
+    - vegetation
+    - terrain
+    - sky
+    - person
+    - rider
+    - car
+    - truck
+    - bus
+    - train
+    - motorcycle
+    - bicycle
+  ignore_index: 255
+  background_class_id:
+
+model:
+  name: nvidia/segformer-b0-finetuned-cityscapes-1024-1024
+  backend: transformers
+  pretrained: true
+
+data:
+  image_size: [512, 1024]
+  batch_size: 1
+  num_workers: 0
+
+predict:
+  overlay_alpha: 0.38
+  display:
+    palette: vivid
+    show_panel: true
+    show_labels: true
+    show_confidence: true
+    show_percentages: true
+    max_classes: 8
+    max_labels: 10
+    label_min_pixels: 900
+    panel_position: top_right

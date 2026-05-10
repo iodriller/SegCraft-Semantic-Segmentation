@@ -5,11 +5,14 @@
 ### Added
 - Direct video prediction that writes annotated overlay MP4 files from video input.
 - Original-video copies and side-by-side comparison MP4 files for video prediction.
+- Cityscapes video preset using SegFormer through the optional Transformers backend.
+- Configurable overlay display controls for panels, region labels, confidence, percentages, and palette.
 - Per-class confidence metadata in prediction overlays and `summary.json`.
 - Minimal training controls for schedulers, AMP, checkpoint resume, early stopping, and JSON run summaries.
 
 ### Changed
 - Video examples now use a 16:9 prediction size to avoid square-frame distortion.
+- Prediction overlays now use a vivid class palette by default.
 
 ## [0.1.0] - 2026-05-02
 

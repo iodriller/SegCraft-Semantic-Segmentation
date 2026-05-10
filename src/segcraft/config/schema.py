@@ -17,7 +17,9 @@ REQUIRED_TOP_LEVEL_KEYS = {
 }
 
 ALLOWED_TASK_TYPES = {"binary", "multiclass"}
-ALLOWED_MODEL_BACKENDS = {"auto", "torchvision", "smp"}
+ALLOWED_MODEL_BACKENDS = {"auto", "torchvision", "smp", "transformers"}
+ALLOWED_DISPLAY_PALETTES = {"vivid", "pascal"}
+ALLOWED_PANEL_POSITIONS = {"top_left", "top_right", "bottom_left", "bottom_right"}
 
 
 class ConfigValidationError(ValueError):
@@ -55,6 +57,12 @@ def _as_string(section: str, key: str, value: Any, *, allow_empty: bool = False)
     return value
 
 
+def _as_bool(section: str, key: str, value: Any) -> bool:
+    if not isinstance(value, bool):
+        raise ConfigValidationError(f"{section}.{key} must be true or false")
+    return value
+
+
 def _as_string_list(section: str, key: str, value: Any) -> list[str]:
     if value is None:
         return []
@@ -81,6 +89,7 @@ class TaskConfig:
     num_classes: int
     class_names: list[str] = field(default_factory=list)
     ignore_index: int | None = 255
+    background_class_id: int | None = 0
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "TaskConfig":
@@ -109,11 +118,17 @@ class TaskConfig:
         if ignore_index is not None and not isinstance(ignore_index, int):
             raise ConfigValidationError("task.ignore_index must be an integer or null")
 
+        background_class_id = data.get("background_class_id", 0)
+        if background_class_id is not None:
+            if not isinstance(background_class_id, int) or background_class_id < 0:
+                raise ConfigValidationError("task.background_class_id must be a non-negative integer or null")
+
         return cls(
             type=task_type,
             num_classes=num_classes,
             class_names=class_names,
             ignore_index=ignore_index,
+            background_class_id=background_class_id,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -122,6 +137,7 @@ class TaskConfig:
             "num_classes": self.num_classes,
             "class_names": list(self.class_names),
             "ignore_index": self.ignore_index,
+            "background_class_id": self.background_class_id,
         }
 
 
@@ -266,6 +282,72 @@ class EvalConfig:
 
 
 @dataclass(frozen=True)
+class DisplayConfig:
+    palette: str = "vivid"
+    show_panel: bool = True
+    show_labels: bool = True
+    show_confidence: bool = True
+    show_percentages: bool = True
+    max_classes: int = 6
+    max_labels: int = 8
+    label_min_pixels: int = 600
+    panel_position: str = "bottom_left"
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any] | None) -> "DisplayConfig":
+        data = data or {}
+        if not isinstance(data, Mapping):
+            raise ConfigValidationError("predict.display must be a mapping/object")
+
+        palette = _as_string("predict.display", "palette", data.get("palette", "vivid")).lower()
+        if palette not in ALLOWED_DISPLAY_PALETTES:
+            options = ", ".join(sorted(ALLOWED_DISPLAY_PALETTES))
+            raise ConfigValidationError(f"predict.display.palette must be one of: {options}")
+
+        panel_position = _as_string(
+            "predict.display",
+            "panel_position",
+            data.get("panel_position", "bottom_left"),
+        ).lower()
+        if panel_position not in ALLOWED_PANEL_POSITIONS:
+            options = ", ".join(sorted(ALLOWED_PANEL_POSITIONS))
+            raise ConfigValidationError(f"predict.display.panel_position must be one of: {options}")
+
+        return cls(
+            palette=palette,
+            show_panel=_as_bool("predict.display", "show_panel", data.get("show_panel", True)),
+            show_labels=_as_bool("predict.display", "show_labels", data.get("show_labels", True)),
+            show_confidence=_as_bool(
+                "predict.display", "show_confidence", data.get("show_confidence", True)
+            ),
+            show_percentages=_as_bool(
+                "predict.display", "show_percentages", data.get("show_percentages", True)
+            ),
+            max_classes=_as_positive_int(
+                "predict.display", "max_classes", data.get("max_classes", 6)
+            ),
+            max_labels=_as_positive_int("predict.display", "max_labels", data.get("max_labels", 8)),
+            label_min_pixels=_as_nonnegative_int(
+                "predict.display", "label_min_pixels", data.get("label_min_pixels", 600)
+            ),
+            panel_position=panel_position,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "palette": self.palette,
+            "show_panel": self.show_panel,
+            "show_labels": self.show_labels,
+            "show_confidence": self.show_confidence,
+            "show_percentages": self.show_percentages,
+            "max_classes": self.max_classes,
+            "max_labels": self.max_labels,
+            "label_min_pixels": self.label_min_pixels,
+            "panel_position": self.panel_position,
+        }
+
+
+@dataclass(frozen=True)
 class PredictConfig:
     input_path: str
     output_path: str
@@ -275,6 +357,7 @@ class PredictConfig:
     video_fps: float = 6.0
     video_path: str | None = None
     preserve_audio: bool = True
+    display: DisplayConfig = field(default_factory=DisplayConfig)
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "PredictConfig":
@@ -304,6 +387,7 @@ class PredictConfig:
             video_fps=video_fps,
             video_path=video_path,
             preserve_audio=preserve_audio,
+            display=DisplayConfig.from_mapping(data.get("display")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -316,6 +400,7 @@ class PredictConfig:
             "video_fps": self.video_fps,
             "video_path": self.video_path,
             "preserve_audio": self.preserve_audio,
+            "display": self.display.to_dict(),
         }
 
 

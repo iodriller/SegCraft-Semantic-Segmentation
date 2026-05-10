@@ -14,6 +14,11 @@ predict:
   annotate: true
   save_video: true
   preserve_audio: true
+  display:
+    show_panel: true
+    show_labels: true
+    show_confidence: true
+    show_percentages: true
 train:
   # Optional: set a checkpoint path to continue a run.
   resume_from:

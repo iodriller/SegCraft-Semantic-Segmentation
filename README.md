@@ -26,6 +26,7 @@ Optional extras:
 
 ```bash
 pip install -e ".[torch,smp]"   # Unet, FPN, Linknet, PSPNet via segmentation-models-pytorch
+pip install -e ".[torch,transformers]"  # Hugging Face semantic segmentation models
 pip install -e ".[video]"       # YouTube download/frame/video helpers
 pip install -e ".[dev]"         # test runner
 ```
@@ -59,10 +60,10 @@ segcraft evaluate --config configs/base.yaml --preset configs/presets/quality.ya
 
 ## YouTube Demo
 
-Install the extras used by the demo:
+Install the extras used by the Cityscapes video demo:
 
 ```bash
-pip install -e ".[torch,video]"
+pip install -e ".[torch,transformers,video]"
 ```
 
 Prepare a video. On CPU, start with a short clip:
@@ -90,7 +91,7 @@ Path("configs/local.yaml").write_text(
 Run prediction:
 
 ```bash
-segcraft predict --config configs/base.yaml --preset configs/presets/fast_dev.yaml --local configs/local.yaml
+segcraft predict --config configs/base.yaml --preset configs/presets/cityscapes_video.yaml --local configs/local.yaml
 ```
 
 For video input, the output folder contains:
@@ -110,6 +111,22 @@ metadata.
 For video demos, keep `data.image_size` close to the source aspect ratio. The
 example above uses `[360, 640]` for a 16:9 clip.
 
+Display controls live under `predict.display`:
+
+```yaml
+predict:
+  display:
+    palette: vivid           # vivid or pascal
+    show_panel: true
+    show_labels: true        # labels near large predicted regions
+    show_confidence: true
+    show_percentages: true
+    max_classes: 8
+    max_labels: 10
+    label_min_pixels: 900
+    panel_position: top_right
+```
+
 ## Configuration
 
 SegCraft uses one main config with optional overlays:
@@ -118,6 +135,7 @@ SegCraft uses one main config with optional overlays:
 configs/base.yaml
 configs/presets/fast_dev.yaml
 configs/presets/quality.yaml
+configs/presets/cityscapes_video.yaml
 configs/presets/binary_quickstart.yaml
 configs/local.example.yaml
 ```
@@ -175,6 +193,10 @@ segmentation-models-pytorch:
 - `fpn`
 - `linknet`
 - `pspnet`
+
+Transformers:
+
+- Hugging Face model ids such as `nvidia/segformer-b0-finetuned-cityscapes-1024-1024`
 
 ## Repository Layout
 

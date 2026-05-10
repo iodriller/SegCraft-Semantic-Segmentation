@@ -111,14 +111,6 @@ class TaskConfig:
             raise ConfigValidationError("For multiclass task.type, task.num_classes must be >= 2")
 
         class_names = _as_string_list("task", "class_names", data.get("class_names", []))
-        valid_name_counts = {num_classes}
-        if task_type == "binary":
-            valid_name_counts.add(2)
-        if class_names and len(class_names) not in valid_name_counts:
-            raise ConfigValidationError(
-                "task.class_names must match task.num_classes; binary configs may also use "
-                "[background, foreground]"
-            )
 
         ignore_index = data.get("ignore_index", 255)
         if ignore_index is not None and not isinstance(ignore_index, int):

@@ -1,4 +1,5 @@
 from segcraft.models import build_model
+from segcraft.models.registry import _transformers_background_class_id, _transformers_class_names
 
 
 def task_config():
@@ -37,3 +38,13 @@ def test_build_model_rejects_wrong_backend():
         assert False, "expected ValueError"
     except ValueError as exc:
         assert "Unsupported model" in str(exc)
+
+
+def test_transformers_label_metadata_uses_model_labels():
+    class Config:
+        id2label = {0: "road", 1: "traffic light"}
+
+    class_names = _transformers_class_names(Config(), 2)
+
+    assert class_names == ["road", "traffic_light"]
+    assert _transformers_background_class_id(class_names) is None

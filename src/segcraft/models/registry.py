@@ -188,7 +188,7 @@ def _create_transformers_model(spec: Mapping[str, Any]) -> Any:
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "Transformers models require optional dependencies. "
-            "Install with `pip install -e .[transformers]`."
+            "Install with `pip install -e .[torch,transformers]`."
         ) from exc
 
     model_name = spec["factory"]
@@ -198,16 +198,23 @@ def _create_transformers_model(spec: Mapping[str, Any]) -> Any:
         model = AutoModelForSemanticSegmentation.from_config(AutoConfig.from_pretrained(model_name))
 
     num_labels = int(getattr(model.config, "num_labels", spec["num_classes"]))
-    if num_labels != spec["num_classes"]:
-        raise ValueError(
-            f"Model '{model_name}' has {num_labels} labels, but task.num_classes is "
-            f"{spec['num_classes']}"
-        )
+    class_names = _transformers_class_names(model.config, num_labels)
+    background_class_id = _transformers_background_class_id(class_names)
 
     class TransformersSegmentationWrapper(torch.nn.Module):
-        def __init__(self, wrapped_model: Any) -> None:
+        def __init__(
+            self,
+            wrapped_model: Any,
+            *,
+            model_num_classes: int,
+            model_class_names: list[str],
+            model_background_class_id: int | None,
+        ) -> None:
             super().__init__()
             self.model = wrapped_model
+            self.segcraft_num_classes = model_num_classes
+            self.segcraft_class_names = model_class_names
+            self.segcraft_background_class_id = model_background_class_id
 
         def forward(self, pixel_values: Any) -> dict[str, Any]:
             output = self.model(pixel_values=pixel_values)
@@ -221,4 +228,34 @@ def _create_transformers_model(spec: Mapping[str, Any]) -> Any:
                 )
             return {"out": logits}
 
-    return TransformersSegmentationWrapper(model)
+    return TransformersSegmentationWrapper(
+        model,
+        model_num_classes=num_labels,
+        model_class_names=class_names,
+        model_background_class_id=background_class_id,
+    )
+
+
+def _transformers_class_names(config: Any, num_labels: int) -> list[str]:
+    id_to_label = getattr(config, "id2label", None) or {}
+    labels = []
+    for class_id in range(num_labels):
+        label = id_to_label.get(class_id, id_to_label.get(str(class_id)))
+        if label is None:
+            return []
+        labels.append(_normalize_label_name(label))
+    if all(label.startswith("label_") for label in labels):
+        return []
+    return labels
+
+
+def _normalize_label_name(label: Any) -> str:
+    return str(label).strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def _transformers_background_class_id(class_names: list[str]) -> int | None:
+    if not class_names:
+        return None
+    if class_names[0] in {"background", "bg", "void", "other", "unlabeled"}:
+        return 0
+    return None

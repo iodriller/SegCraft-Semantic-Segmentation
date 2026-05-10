@@ -23,3 +23,10 @@ def test_schema_rejects_binary_with_wrong_num_classes():
         assert False, "expected ConfigValidationError"
     except ConfigValidationError:
         assert True
+
+
+def test_schema_allows_display_name_count_mismatch():
+    cfg = valid_config("multiclass", 4)
+    cfg["task"]["class_names"] = ["background", "foreground"]
+
+    validate_config(cfg)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib.resources import as_file, files
 from pathlib import Path
 from typing import Any, Dict
 
@@ -27,6 +28,46 @@ def _load_yaml(path: Path) -> Dict[str, Any]:
     return data
 
 
+def list_available_presets() -> list[str]:
+    """Return preset names available from the source tree or installed package."""
+    names = set()
+    local_dir = Path("configs/presets")
+    if local_dir.exists():
+        names.update(path.stem for path in local_dir.glob("*.yaml"))
+
+    try:
+        preset_dir = files("segcraft.templates.presets")
+        names.update(item.name.removesuffix(".yaml") for item in preset_dir.iterdir() if item.name.endswith(".yaml"))
+    except ModuleNotFoundError:
+        pass
+    return sorted(names)
+
+
+def _load_preset_yaml(preset_path: str | Path) -> Dict[str, Any]:
+    candidate = Path(preset_path)
+    if candidate.exists():
+        return _load_yaml(candidate)
+
+    preset_name = candidate.name
+    if not preset_name.endswith((".yaml", ".yml")):
+        preset_name = f"{preset_name}.yaml"
+
+    local_candidate = Path("configs/presets") / preset_name
+    if local_candidate.exists():
+        return _load_yaml(local_candidate)
+
+    try:
+        resource = files("segcraft.templates.presets").joinpath(preset_name)
+        if resource.is_file():
+            with as_file(resource) as resource_path:
+                return _load_yaml(resource_path)
+    except ModuleNotFoundError:
+        pass
+
+    available = ", ".join(list_available_presets()) or "none"
+    raise FileNotFoundError(f"Preset not found: {preset_path}. Available presets: {available}")
+
+
 def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
     merged = dict(base)
     for key, value in override.items():
@@ -47,7 +88,7 @@ def _load_merged_config(
 
     if preset_path:
         # Friendly behavior: missing preset should fail fast so users don't silently run defaults.
-        preset_cfg = _load_yaml(Path(preset_path))
+        preset_cfg = _load_preset_yaml(preset_path)
         config = _deep_merge(config, preset_cfg)
 
     if local_path and Path(local_path).exists():

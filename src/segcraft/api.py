@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict
 
-from .config.loader import load_and_validate_config, load_config_object as load_typed_config
+from .config.loader import (
+    list_available_presets,
+    load_and_validate_config,
+    load_config_object as load_typed_config,
+)
 from .config.schema import SegCraftConfig
 from .engine import evaluate as run_evaluate
 from .engine import predict as run_predict

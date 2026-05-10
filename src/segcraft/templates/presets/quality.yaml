@@ -1,0 +1,11 @@
+train:
+  epochs: 80
+  learning_rate: 0.0001
+  loss: dice_ce
+  scheduler: cosine
+  amp: true
+  early_stopping_patience: 8
+data:
+  batch_size: 8
+eval:
+  metrics: [iou, dice, pixel_accuracy]

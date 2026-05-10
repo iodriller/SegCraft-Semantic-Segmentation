@@ -1,8 +1,6 @@
 task:
   type: multiclass
   num_classes: 19
-  # Presets are overlays on configs/base.yaml. This one swaps the base PASCAL
-  # labels/model for a Cityscapes SegFormer checkpoint.
   class_names:
     - road
     - sidewalk

@@ -1,0 +1,7 @@
+train:
+  epochs: 1
+data:
+  batch_size: 2
+  image_size: [256, 256]
+runtime:
+  device: cpu

@@ -1,5 +1,8 @@
 task:
   type: multiclass
+  # num_classes controls trainable model heads. class_names are display labels;
+  # missing or mismatched names fall back to class_<id> during prediction.
+  # This base config matches TorchVision's PASCAL/VOC segmentation weights.
   num_classes: 21
   class_names:
     - background
@@ -27,6 +30,12 @@ task:
   background_class_id: 0
 
 model:
+  # backend: auto, torchvision, smp, or transformers.
+  # torchvision: deeplabv3_resnet50, deeplabv3_resnet101, fcn_resnet50,
+  #   fcn_resnet101, lraspp_mobilenet_v3_large.
+  # smp: unet, unetplusplus, fpn, linknet, pspnet (optionally set encoder).
+  # transformers: Hugging Face semantic segmentation model ids, for example
+  #   nvidia/segformer-b0-finetuned-cityscapes-1024-1024.
   name: deeplabv3_resnet50
   backend: torchvision
   pretrained: true

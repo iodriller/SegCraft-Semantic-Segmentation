@@ -15,3 +15,6 @@ def test_webapp_homepage_loads():
     assert response.status_code == 200
     assert "SegCraft" in response.text
     assert "/jobs" in response.text
+    assert "Upload video" in response.text
+    assert "YouTube URL" in response.text
+    assert "pascal_video" in response.text

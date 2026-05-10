@@ -37,7 +37,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--preset",
         type=Path,
         default=None,
-        help="Optional preset override YAML (e.g. configs/presets/fast_dev.yaml).",
+        help="Optional preset name or YAML path (e.g. fast_dev or configs/presets/fast_dev.yaml).",
     )
     parser.add_argument(
         "--local",

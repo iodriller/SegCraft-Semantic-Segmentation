@@ -1,0 +1,24 @@
+task:
+  type: binary
+  num_classes: 1
+  class_names: [background, foreground]
+  background_class_id: 0
+
+model:
+  name: unet
+  backend: smp
+  encoder: resnet34
+  pretrained: true
+
+data:
+  image_size: [512, 512]
+  batch_size: 4
+
+train:
+  loss: auto
+  scheduler: cosine
+  amp: true
+  early_stopping_patience: 8
+
+eval:
+  metrics: [iou, dice, pixel_accuracy]

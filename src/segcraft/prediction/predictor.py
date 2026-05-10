@@ -102,6 +102,7 @@ def _run_image_prediction(
     torch = _torch()
     model, device, device_fallback = _create_model_on_device(cfg, torch)
     model.eval()
+    prediction_metadata = _prediction_metadata(cfg, model)
 
     artifacts = []
     class_totals: dict[int, dict[str, Any]] = {}
@@ -114,10 +115,10 @@ def _run_image_prediction(
                 model_name=cfg.model.name,
                 device=device,
                 image_size=cfg.data.image_size,
-                task_type=cfg.task.type,
-                num_classes=cfg.task.num_classes,
-                class_names=cfg.task.class_names,
-                background_class_id=cfg.task.background_class_id,
+                task_type=prediction_metadata["task_type"],
+                num_classes=prediction_metadata["num_classes"],
+                class_names=prediction_metadata["class_names"],
+                background_class_id=prediction_metadata["background_class_id"],
                 overlay_alpha=cfg.predict.overlay_alpha,
                 annotate=cfg.predict.annotate,
                 display=cfg.predict.display,
@@ -183,6 +184,7 @@ def _run_video_prediction(
     torch = _torch()
     model, device, device_fallback = _create_model_on_device(cfg, torch)
     model.eval()
+    prediction_metadata = _prediction_metadata(cfg, model)
 
     cv2 = _cv2()
     video_info = probe_video(input_path)
@@ -272,10 +274,10 @@ def _run_video_prediction(
                     model_name=cfg.model.name,
                     device=device,
                     image_size=cfg.data.image_size,
-                    task_type=cfg.task.type,
-                    num_classes=cfg.task.num_classes,
-                    class_names=cfg.task.class_names,
-                    background_class_id=cfg.task.background_class_id,
+                    task_type=prediction_metadata["task_type"],
+                    num_classes=prediction_metadata["num_classes"],
+                    class_names=prediction_metadata["class_names"],
+                    background_class_id=prediction_metadata["background_class_id"],
                     overlay_alpha=cfg.predict.overlay_alpha,
                     annotate=cfg.predict.annotate,
                     display=cfg.predict.display,
@@ -938,6 +940,34 @@ def _create_model_on_device(cfg: SegCraftConfig, torch: Any) -> tuple[Any, Any, 
             reason = str(exc).splitlines()[0][:300]
             return create_model(cfg.model, cfg.task).to(cpu), cpu, reason
         raise
+
+
+def _prediction_metadata(cfg: SegCraftConfig, model: Any) -> dict[str, Any]:
+    num_classes = int(getattr(model, "segcraft_num_classes", cfg.task.num_classes))
+    task_type = cfg.task.type
+    if task_type == "binary" and num_classes != 1:
+        task_type = "multiclass"
+
+    if hasattr(model, "segcraft_class_names"):
+        class_names = list(getattr(model, "segcraft_class_names") or [])
+    elif num_classes == cfg.task.num_classes:
+        class_names = list(cfg.task.class_names)
+    else:
+        class_names = []
+
+    if hasattr(model, "segcraft_background_class_id"):
+        background_class_id = getattr(model, "segcraft_background_class_id")
+    elif num_classes == cfg.task.num_classes:
+        background_class_id = cfg.task.background_class_id
+    else:
+        background_class_id = None
+
+    return {
+        "task_type": task_type,
+        "num_classes": num_classes,
+        "class_names": class_names,
+        "background_class_id": background_class_id,
+    }
 
 
 def _palette(

@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+## [0.1.1] - 2026-05-10
+
 ### Added
+- Packaged named presets for installed-package use.
+- Web app preset dropdown with a custom preset path/name override.
+- Additional presets for PASCAL video, ADE20K video, CPU demo video, and SMP Unet training.
 - Optional FastAPI web app for video upload, YouTube input, progress, and output downloads.
 - Prediction progress callback support.
 - Optional-extra smoke CI and release publishing workflow.
@@ -21,6 +26,9 @@
 - Minimal training controls for schedulers, AMP, checkpoint resume, early stopping, and JSON run summaries.
 
 ### Changed
+- Config validation now treats `task.class_names` as display metadata so mismatched label lists do not block prediction experiments.
+- Transformers prediction now uses model label metadata when available.
+- README streamlined around install, CLI, notebooks, web app, presets, and release commands.
 - Video examples now use a 16:9 prediction size to avoid square-frame distortion.
 - Prediction overlays now use a vivid class palette by default.
 

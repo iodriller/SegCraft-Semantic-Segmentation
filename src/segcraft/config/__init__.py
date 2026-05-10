@@ -1,6 +1,6 @@
 """Configuration tools for SegCraft."""
 
-from .loader import load_and_validate_config, load_config_object
+from .loader import list_available_presets, load_and_validate_config, load_config_object
 from .schema import (
     ConfigValidationError,
     DataConfig,
@@ -27,6 +27,7 @@ __all__ = [
     "TrainConfig",
     "load_and_validate_config",
     "load_config_object",
+    "list_available_presets",
     "parse_config",
     "validate_config",
 ]

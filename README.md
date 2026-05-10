@@ -81,6 +81,8 @@ Path("configs/local.yaml").write_text(
     "predict:\n"
     "  input_path: data/demo/video.mp4\n"
     "  output_path: outputs/demo_predictions\n"
+    "  video_max_seconds: 60\n"
+    "  video_frame_stride: 1\n"
     "  preserve_audio: true\n"
     "runtime:\n"
     "  output_dir: outputs/demo\n",
@@ -96,7 +98,7 @@ segcraft predict --config configs/base.yaml --preset configs/presets/cityscapes_
 
 For video input, the output folder contains:
 
-- `original.mp4`: a copy of the source dashcam clip used for prediction
+- `original.mp4`: the source frames used for prediction
 - `overlay.mp4`: the same video with semantic segmentation overlays and class/confidence metadata
 - `comparison.mp4`: original and processed videos side by side
 - `summary.json`: frame counts, video metadata, class coverage, and mean/max confidence values
@@ -111,6 +113,18 @@ metadata.
 For video demos, keep `data.image_size` close to the source aspect ratio. The
 example above uses `[360, 640]` for a 16:9 clip.
 
+Video sampling controls live under `predict`:
+
+```yaml
+predict:
+  video_max_seconds: 60    # null means process the whole video
+  video_frame_stride: 1    # 1 means every frame; 2 means every other frame
+```
+
+Direct video prediction preserves the source FPS when `video_frame_stride` is
+`1`. If you increase the stride, SegCraft lowers the output FPS so the processed
+video keeps the same real-time pace instead of speeding up.
+
 Display controls live under `predict.display`:
 
 ```yaml
@@ -124,8 +138,17 @@ predict:
     max_classes: 8
     max_labels: 10
     label_min_pixels: 900
+    label_move_threshold: 36 # pixels; ignore smaller label movements frame to frame
+    label_smoothing: 0.7     # 0 disables smoothing, higher values move labels more slowly
     panel_position: top_right
 ```
+
+The detectable classes are the model's labels. Configure the display names in
+`task.class_names`; keep the list aligned with the model checkpoint. For the
+Cityscapes preset, the classes are `road`, `sidewalk`, `building`, `wall`,
+`fence`, `pole`, `traffic_light`, `traffic_sign`, `vegetation`, `terrain`,
+`sky`, `person`, `rider`, `car`, `truck`, `bus`, `train`, `motorcycle`, and
+`bicycle`.
 
 ## Configuration
 

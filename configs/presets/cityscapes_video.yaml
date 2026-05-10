@@ -1,6 +1,7 @@
 task:
   type: multiclass
   num_classes: 19
+  # These labels come from the Cityscapes checkpoint. Keep them aligned with the model.
   class_names:
     - road
     - sidewalk
@@ -36,6 +37,8 @@ data:
 
 predict:
   overlay_alpha: 0.38
+  video_max_seconds:
+  video_frame_stride: 1
   display:
     palette: vivid
     show_panel: true
@@ -45,4 +48,6 @@ predict:
     max_classes: 8
     max_labels: 10
     label_min_pixels: 900
+    label_move_threshold: 36
+    label_smoothing: 0.7
     panel_position: top_right

@@ -24,7 +24,11 @@ def test_parse_config_returns_typed_sections():
     assert config.train.scheduler == "none"
     assert config.train.amp is False
     assert config.predict.preserve_audio is True
+    assert config.predict.video_max_seconds is None
+    assert config.predict.video_frame_stride == 1
     assert config.predict.display.palette == "vivid"
+    assert config.predict.display.label_move_threshold == 36
+    assert config.predict.display.label_smoothing == 0.7
 
 
 def test_parse_config_rejects_invalid_overlay_alpha():
@@ -59,3 +63,15 @@ def test_parse_config_accepts_cityscapes_without_background_class():
     parsed = parse_config(cfg)
     assert parsed.task.background_class_id is None
     assert parsed.model.backend == "transformers"
+
+
+def test_parse_config_accepts_video_sampling_controls():
+    cfg = base_config()
+    cfg["predict"]["video_max_seconds"] = 60
+    cfg["predict"]["video_frame_stride"] = 3
+    cfg["predict"]["display"] = {"label_move_threshold": 48, "label_smoothing": 0.8}
+    parsed = parse_config(cfg)
+    assert parsed.predict.video_max_seconds == 60
+    assert parsed.predict.video_frame_stride == 3
+    assert parsed.predict.display.label_move_threshold == 48
+    assert parsed.predict.display.label_smoothing == 0.8

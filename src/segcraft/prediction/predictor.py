@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from math import hypot
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -10,7 +11,6 @@ from segcraft.config import SegCraftConfig, parse_config
 from segcraft.data import list_image_files
 from segcraft.models import create_model
 from segcraft.video import (
-    copy_video_file,
     is_video_file,
     mux_audio_from_source,
     probe_video,
@@ -144,10 +144,15 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
 
     cv2 = _cv2()
     video_info = probe_video(input_path)
-    fps = float(video_info["fps"] or cfg.predict.video_fps)
+    source_fps = float(video_info["fps"] or cfg.predict.video_fps)
+    frame_stride = cfg.predict.video_frame_stride
+    fps = source_fps / frame_stride
+    max_source_frames = None
+    if cfg.predict.video_max_seconds is not None:
+        max_source_frames = max(1, int(round(cfg.predict.video_max_seconds * source_fps)))
     source_width, source_height = video_info["size"]
     video_path = _prediction_video_path(cfg, output_dir)
-    original_video = copy_video_file(input_path, _original_video_path(input_path, output_dir))
+    original_video_path = _original_video_path(input_path, output_dir)
 
     cap = cv2.VideoCapture(str(input_path))
     if not cap.isOpened():
@@ -162,6 +167,7 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     output_width, output_height = _even_size(source_width, source_height)
 
     writer = None
+    original_writer = None
     write_target = _silent_video_path(video_path) if cfg.predict.preserve_audio else video_path
     codec = _video_codec(video_path)
     if cfg.predict.save_video:
@@ -174,16 +180,35 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         )
         if not writer.isOpened():
             raise RuntimeError(f"Could not open video writer for {write_target} with codec {codec}")
+        original_writer = cv2.VideoWriter(
+            str(original_video_path),
+            cv2.VideoWriter_fourcc(*codec),
+            fps,
+            (output_width, output_height),
+        )
+        if not original_writer.isOpened():
+            writer.release()
+            raise RuntimeError(
+                f"Could not open video writer for {original_video_path} with codec {codec}"
+            )
 
     samples = []
     class_totals: dict[int, dict[str, Any]] = {}
+    label_positions: dict[int, tuple[float, float]] = {}
+    source_frame_index = 0
     frames_processed = 0
     try:
         with torch.inference_mode():
             while True:
+                if max_source_frames is not None and source_frame_index >= max_source_frames:
+                    break
                 ok, frame = cap.read()
                 if not ok:
                     break
+                should_process = source_frame_index % frame_stride == 0
+                if not should_process:
+                    source_frame_index += 1
+                    continue
 
                 image = _pil().fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 result = _predict_image(
@@ -201,6 +226,7 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
                     overlay_alpha=cfg.predict.overlay_alpha,
                     annotate=cfg.predict.annotate,
                     display=cfg.predict.display,
+                    label_positions=label_positions,
                 )
 
                 if writer is not None:
@@ -209,28 +235,39 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
                     if overlay.shape[:2] != (output_height, output_width):
                         overlay = cv2.resize(overlay, (output_width, output_height))
                     writer.write(overlay)
+                if original_writer is not None:
+                    original_frame = _prepare_video_frame(frame, output_width, output_height, cv2)
+                    original_writer.write(original_frame)
 
                 if len(samples) < 5:
                     samples.append(
                         {
                             "frame_index": frames_processed,
+                            "source_frame_index": source_frame_index,
                             "classes": result["classes"],
                         }
                     )
                 _update_class_totals(class_totals, result["classes"], result["total_pixels"])
                 frames_processed += 1
+                source_frame_index += 1
     finally:
         cap.release()
         if writer is not None:
             writer.release()
+        if original_writer is not None:
+            original_writer.release()
 
     if frames_processed == 0:
         raise ValueError(f"No frames could be read from video: {input_path}")
 
     overlay_video = None
     comparison_video = None
+    original_video = None
     audio = {"status": "disabled", "preserved": False}
     if cfg.predict.save_video:
+        verify_video(original_video_path)
+        original_video = probe_video(original_video_path)
+        original_video["source_path"] = str(input_path)
         if cfg.predict.preserve_audio:
             audio = mux_audio_from_source(input_path, write_target, video_path)
         else:
@@ -261,6 +298,13 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         "device": str(device),
         "source_video": video_info,
         "original_video": original_video,
+        "video_sampling": {
+            "source_fps": source_fps,
+            "output_fps": fps,
+            "frame_stride": frame_stride,
+            "max_video_seconds": cfg.predict.video_max_seconds,
+            "source_frames_read": source_frame_index,
+        },
         "frames_processed": frames_processed,
         "class_summary": _finalize_class_totals(class_totals),
         "sample_outputs": samples,
@@ -305,6 +349,7 @@ def _predict_one(
         overlay_alpha=overlay_alpha,
         annotate=annotate,
         display=display,
+        label_positions=None,
     )
 
     mask = result["mask"]
@@ -346,6 +391,7 @@ def _predict_image(
     overlay_alpha: float,
     annotate: bool,
     display: Any,
+    label_positions: dict[int, tuple[float, float]] | None = None,
 ) -> dict[str, Any]:
     original_size = image.size
     batch = _preprocess(image, image_size).to(device)
@@ -363,6 +409,8 @@ def _predict_image(
         background_class_id=background_class_id,
         max_items=display.max_classes,
     )
+    if label_positions is not None:
+        _stabilize_label_positions(classes, label_positions, display)
 
     overlay = _overlay(
         image,
@@ -533,11 +581,11 @@ def _draw_region_labels(
     width, height = image_size
     labels = [item for item in classes if item["pixels"] >= display.label_min_pixels]
     for item in labels[: display.max_labels]:
-        centroid = item.get("centroid")
-        if not centroid:
+        position = item.get("label_position") or item.get("centroid")
+        if not position:
             continue
-        x = int(centroid[0])
-        y = int(centroid[1])
+        x = int(position[0])
+        y = int(position[1])
         color = tuple(_palette_color(palette, item["class_id"]))
         text = _class_metric_text(item, display)
         text_width = max(54, len(text) * 6)
@@ -554,6 +602,42 @@ def _draw_region_labels(
         )
         draw.rectangle((x0 + 4, y0 + 4, x0 + 12, y0 + 14), fill=color + (255,))
         draw.text((x0 + 16, y0 + 4), text[:48], fill=(255, 255, 255, 255), font=font)
+
+
+def _stabilize_label_positions(
+    classes: list[dict[str, Any]],
+    positions: dict[int, tuple[float, float]],
+    display: Any,
+) -> None:
+    active_classes = set()
+    for item in classes:
+        centroid = item.get("centroid")
+        if not centroid:
+            continue
+
+        class_id = int(item["class_id"])
+        current = (float(centroid[0]), float(centroid[1]))
+        previous = positions.get(class_id)
+        if previous is None:
+            stable = current
+        else:
+            distance = hypot(current[0] - previous[0], current[1] - previous[1])
+            if distance < display.label_move_threshold:
+                stable = previous
+            else:
+                keep = display.label_smoothing
+                stable = (
+                    previous[0] * keep + current[0] * (1.0 - keep),
+                    previous[1] * keep + current[1] * (1.0 - keep),
+                )
+
+        positions[class_id] = stable
+        item["label_position"] = [int(round(stable[0])), int(round(stable[1]))]
+        active_classes.add(class_id)
+
+    for class_id in list(positions):
+        if class_id not in active_classes:
+            del positions[class_id]
 
 
 def _panel_origin(
@@ -691,8 +775,7 @@ def _prediction_video_path(cfg: SegCraftConfig, output_dir: Path) -> Path:
 
 
 def _original_video_path(input_path: Path, output_dir: Path) -> Path:
-    suffix = input_path.suffix if input_path.suffix else ".mp4"
-    return output_dir / f"original{suffix.lower()}"
+    return output_dir / "original.mp4"
 
 
 def _silent_video_path(video_path: Path) -> Path:
@@ -709,6 +792,14 @@ def _even_size(width: int, height: int) -> tuple[int, int]:
     width = max(width - (width % 2), 2)
     height = max(height - (height % 2), 2)
     return width, height
+
+
+def _prepare_video_frame(frame: Any, width: int, height: int, cv2: Any) -> Any:
+    if frame.shape[:2] != (height, width):
+        return cv2.resize(frame, (width, height))
+    if width % 2 or height % 2:
+        return frame[: height - (height % 2), : width - (width % 2)]
+    return frame
 
 
 def _mask_class_count(task_type: str, num_classes: int) -> int:

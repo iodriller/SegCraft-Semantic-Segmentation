@@ -7,6 +7,8 @@
 - Original-video copies and side-by-side comparison MP4 files for video prediction.
 - Cityscapes video preset using SegFormer through the optional Transformers backend.
 - Configurable overlay display controls for panels, region labels, confidence, percentages, and palette.
+- Video sampling controls for first-N-seconds prediction and frame stride.
+- Stabilized video label placement to reduce frame-to-frame jitter.
 - Per-class confidence metadata in prediction overlays and `summary.json`.
 - Minimal training controls for schedulers, AMP, checkpoint resume, early stopping, and JSON run summaries.
 

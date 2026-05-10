@@ -13,12 +13,16 @@ predict:
   output_path: /absolute/path/to/predictions
   annotate: true
   save_video: true
+  video_max_seconds:
+  video_frame_stride: 1
   preserve_audio: true
   display:
     show_panel: true
     show_labels: true
     show_confidence: true
     show_percentages: true
+    label_move_threshold: 36
+    label_smoothing: 0.7
 train:
   # Optional: set a checkpoint path to continue a run.
   resume_from:

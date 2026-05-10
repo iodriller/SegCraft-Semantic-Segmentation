@@ -51,6 +51,12 @@ def _as_positive_float(section: str, key: str, value: Any) -> float:
     return float(value)
 
 
+def _as_probability_float(section: str, key: str, value: Any) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 1:
+        raise ConfigValidationError(f"{section}.{key} must be between 0 and 1")
+    return float(value)
+
+
 def _as_string(section: str, key: str, value: Any, *, allow_empty: bool = False) -> str:
     if not isinstance(value, str) or (not allow_empty and not value.strip()):
         raise ConfigValidationError(f"{section}.{key} must be a non-empty string")
@@ -291,6 +297,8 @@ class DisplayConfig:
     max_classes: int = 6
     max_labels: int = 8
     label_min_pixels: int = 600
+    label_move_threshold: int = 36
+    label_smoothing: float = 0.7
     panel_position: str = "bottom_left"
 
     @classmethod
@@ -330,6 +338,12 @@ class DisplayConfig:
             label_min_pixels=_as_nonnegative_int(
                 "predict.display", "label_min_pixels", data.get("label_min_pixels", 600)
             ),
+            label_move_threshold=_as_nonnegative_int(
+                "predict.display", "label_move_threshold", data.get("label_move_threshold", 36)
+            ),
+            label_smoothing=_as_probability_float(
+                "predict.display", "label_smoothing", data.get("label_smoothing", 0.7)
+            ),
             panel_position=panel_position,
         )
 
@@ -343,6 +357,8 @@ class DisplayConfig:
             "max_classes": self.max_classes,
             "max_labels": self.max_labels,
             "label_min_pixels": self.label_min_pixels,
+            "label_move_threshold": self.label_move_threshold,
+            "label_smoothing": self.label_smoothing,
             "panel_position": self.panel_position,
         }
 
@@ -355,6 +371,8 @@ class PredictConfig:
     annotate: bool = True
     save_video: bool = True
     video_fps: float = 6.0
+    video_max_seconds: float | None = None
+    video_frame_stride: int = 1
     video_path: str | None = None
     preserve_audio: bool = True
     display: DisplayConfig = field(default_factory=DisplayConfig)
@@ -371,6 +389,14 @@ class PredictConfig:
         if not isinstance(save_video, bool):
             raise ConfigValidationError("predict.save_video must be true or false")
         video_fps = _as_positive_float("predict", "video_fps", data.get("video_fps", 6.0))
+        video_max_seconds = data.get("video_max_seconds")
+        if video_max_seconds is not None:
+            video_max_seconds = _as_positive_float(
+                "predict", "video_max_seconds", video_max_seconds
+            )
+        video_frame_stride = _as_positive_int(
+            "predict", "video_frame_stride", data.get("video_frame_stride", 1)
+        )
         video_path = data.get("video_path")
         if video_path is not None:
             video_path = _as_string("predict", "video_path", video_path)
@@ -385,6 +411,8 @@ class PredictConfig:
             annotate=annotate,
             save_video=save_video,
             video_fps=video_fps,
+            video_max_seconds=video_max_seconds,
+            video_frame_stride=video_frame_stride,
             video_path=video_path,
             preserve_audio=preserve_audio,
             display=DisplayConfig.from_mapping(data.get("display")),
@@ -398,6 +426,8 @@ class PredictConfig:
             "annotate": self.annotate,
             "save_video": self.save_video,
             "video_fps": self.video_fps,
+            "video_max_seconds": self.video_max_seconds,
+            "video_frame_stride": self.video_frame_stride,
             "video_path": self.video_path,
             "preserve_audio": self.preserve_audio,
             "display": self.display.to_dict(),

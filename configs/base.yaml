@@ -61,6 +61,8 @@ predict:
   annotate: true
   save_video: true
   video_fps: 6
+  video_max_seconds:
+  video_frame_stride: 1
   video_path:
   preserve_audio: true
   display:
@@ -72,6 +74,8 @@ predict:
     max_classes: 6
     max_labels: 8
     label_min_pixels: 600
+    label_move_threshold: 36
+    label_smoothing: 0.7
     panel_position: bottom_left
 
 runtime:

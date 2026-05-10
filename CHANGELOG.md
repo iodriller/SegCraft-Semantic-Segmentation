@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Added
+- Release metadata for PyPI packaging.
+- Lightweight API notebook for config loading, model specs, and dataset pairing.
+- Packaged CLI base config so `segcraft validate` works after wheel install.
 - Direct video prediction that writes annotated overlay MP4 files from video input.
 - Original-video copies and side-by-side comparison MP4 files for video prediction.
 - Cityscapes video preset using SegFormer through the optional Transformers backend.

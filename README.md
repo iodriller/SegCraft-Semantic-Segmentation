@@ -12,7 +12,19 @@ small video helpers, CLI entry points, and tests.
 
 ## Install
 
-Core install:
+After the first release is published:
+
+```bash
+pip install segcraft
+```
+
+Install directly from GitHub today:
+
+```bash
+pip install "segcraft @ git+https://github.com/iodriller/Semantic-Segmentation.git"
+```
+
+Local development install:
 
 ```bash
 pip install -e .
@@ -46,8 +58,11 @@ pip install --upgrade torch torchvision --index-url https://download.pytorch.org
 Validate a config:
 
 ```bash
-segcraft validate --config configs/base.yaml
+segcraft validate
 ```
+
+When you run from a source checkout, SegCraft uses `configs/base.yaml`. When
+installed from a wheel, the CLI falls back to the packaged base config.
 
 Run prediction on an image folder or a video file:
 
@@ -224,6 +239,11 @@ model = create_model(typed.model, typed.task)
 `load_config` returns the merged dictionary for simple scripts. `load_config_object`
 returns typed config sections for library code.
 
+## Notebooks
+
+- `notebooks/01_quickstart.ipynb`: YouTube/video-to-overlay demo.
+- `notebooks/02_config_and_api.ipynb`: minimal config, dataset pairing, and model-spec API tour.
+
 ## Supported Model Specs
 
 TorchVision:
@@ -262,16 +282,18 @@ configs/
 assets/
 notebooks/
 tests/
-legacy/
 ```
-
-The `legacy/` directory keeps the original script-based workflow, old demo
-artifacts, and migration notes as reference while the package version replaces
-them with maintained modules.
 
 ## Development
 
 ```bash
 pip install -e ".[dev]"
 pytest
+```
+
+Build and check release artifacts:
+
+```bash
+python -m build
+twine check dist/*
 ```

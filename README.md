@@ -8,6 +8,8 @@ The current package supports typed configuration, paired image/mask datasets,
 model selection, supervised train/evaluate loops, image/video prediction,
 small video helpers, CLI entry points, and tests.
 
+![SegCraft GPU demo: original dashcam video beside semantic segmentation overlay](assets/segcraft-gpu-demo.gif)
+
 ## Install
 
 Core install:
@@ -257,13 +259,15 @@ src/segcraft/
   training.py
   video.py
 configs/
+assets/
 notebooks/
 tests/
 legacy/
 ```
 
-The `legacy/` directory keeps the original script-based workflow as reference
-while the package version replaces it with maintained modules.
+The `legacy/` directory keeps the original script-based workflow, old demo
+artifacts, and migration notes as reference while the package version replaces
+them with maintained modules.
 
 ## Development
 

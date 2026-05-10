@@ -4,6 +4,7 @@
 
 ### Added
 - Direct video prediction that writes annotated overlay MP4 files from video input.
+- Original-video copies and side-by-side comparison MP4 files for video prediction.
 - Per-class confidence metadata in prediction overlays and `summary.json`.
 - Minimal training controls for schedulers, AMP, checkpoint resume, early stopping, and JSON run summaries.
 

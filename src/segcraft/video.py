@@ -182,6 +182,110 @@ def mux_audio_from_source(
     }
 
 
+def copy_video_file(
+    source_video: str | Path,
+    output_path: str | Path,
+    *,
+    verify: bool = True,
+) -> dict[str, Any]:
+    """Copy the source video next to prediction outputs for easy comparison."""
+    source_video = Path(source_video)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if source_video.resolve() != output_path.resolve():
+        shutil.copy2(source_video, output_path)
+
+    if verify:
+        _verify_video(output_path)
+
+    metadata = probe_video(output_path)
+    metadata["source_path"] = str(source_video)
+    return metadata
+
+
+def write_side_by_side_video(
+    left_video: str | Path,
+    right_video: str | Path,
+    output_path: str | Path,
+    *,
+    fps: float | None = None,
+    codec: str | None = None,
+    left_label: str = "Original",
+    right_label: str = "SegCraft overlay",
+    verify: bool = True,
+) -> dict[str, Any]:
+    """Write a side-by-side comparison video from two readable video files."""
+    cv2 = _cv2()
+    left_video = Path(left_video)
+    right_video = Path(right_video)
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    left = cv2.VideoCapture(str(left_video))
+    right = cv2.VideoCapture(str(right_video))
+    if not left.isOpened():
+        raise FileNotFoundError(f"Could not open video: {left_video}")
+    if not right.isOpened():
+        left.release()
+        raise FileNotFoundError(f"Could not open video: {right_video}")
+
+    chosen_fps = fps or right.get(cv2.CAP_PROP_FPS) or left.get(cv2.CAP_PROP_FPS) or 6.0
+    ok_left, left_frame = left.read()
+    ok_right, right_frame = right.read()
+    if not ok_left or left_frame is None or not ok_right or right_frame is None:
+        left.release()
+        right.release()
+        raise RuntimeError("Could not read the first frames for comparison video")
+
+    target_height, target_width = right_frame.shape[:2]
+    target_width, target_height = _even_size(target_width, target_height)
+    output_size = (target_width * 2, target_height)
+    chosen_codec = codec or _default_codec(output_path)
+    writer = cv2.VideoWriter(
+        str(output_path),
+        cv2.VideoWriter_fourcc(*chosen_codec),
+        chosen_fps,
+        output_size,
+    )
+    if not writer.isOpened():
+        left.release()
+        right.release()
+        raise RuntimeError(f"Could not open video writer for {output_path} with codec {chosen_codec}")
+
+    frames = 0
+    try:
+        while ok_left and ok_right:
+            left_prepared = _prepare_comparison_frame(left_frame, target_width, target_height)
+            right_prepared = _prepare_comparison_frame(right_frame, target_width, target_height)
+            _draw_video_label(left_prepared, left_label)
+            _draw_video_label(right_prepared, right_label)
+            writer.write(cv2.hconcat([left_prepared, right_prepared]))
+            frames += 1
+            ok_left, left_frame = left.read()
+            ok_right, right_frame = right.read()
+    finally:
+        writer.release()
+        left.release()
+        right.release()
+
+    if frames < 1:
+        raise RuntimeError(f"No frames were written to comparison video: {output_path}")
+    if verify:
+        _verify_video(output_path)
+
+    return {
+        "video_path": str(output_path),
+        "frames": frames,
+        "fps": float(chosen_fps),
+        "duration_seconds": round(frames / float(chosen_fps), 3) if chosen_fps else None,
+        "size": [output_size[0], output_size[1]],
+        "codec": chosen_codec,
+        "left_video": str(left_video),
+        "right_video": str(right_video),
+    }
+
+
 def write_video_from_images(
     image_dir: str | Path,
     output_path: str | Path,
@@ -252,6 +356,47 @@ def _replace_file(source: Path, target: Path) -> None:
     if target.exists():
         target.unlink()
     source.replace(target)
+
+
+def _even_size(width: int, height: int) -> tuple[int, int]:
+    width = max(width - (width % 2), 2)
+    height = max(height - (height % 2), 2)
+    return width, height
+
+
+def _prepare_comparison_frame(frame: Any, width: int, height: int) -> Any:
+    cv2 = _cv2()
+    if frame.shape[:2] != (height, width):
+        frame = cv2.resize(frame, (width, height))
+    if width % 2 or height % 2:
+        frame = frame[: height - (height % 2), : width - (width % 2)]
+    return frame
+
+
+def _draw_video_label(frame: Any, label: str) -> None:
+    cv2 = _cv2()
+    x0, y0 = 10, 10
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = 0.55
+    thickness = 1
+    (text_width, text_height), baseline = cv2.getTextSize(label, font, scale, thickness)
+    cv2.rectangle(
+        frame,
+        (x0 - 4, y0 - 4),
+        (x0 + text_width + 8, y0 + text_height + baseline + 8),
+        (0, 0, 0),
+        -1,
+    )
+    cv2.putText(
+        frame,
+        label,
+        (x0, y0 + text_height + 2),
+        font,
+        scale,
+        (255, 255, 255),
+        thickness,
+        cv2.LINE_AA,
+    )
 
 
 def _has_audio(video_path: Path) -> bool | None:

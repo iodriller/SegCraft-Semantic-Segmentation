@@ -10,10 +10,12 @@ from segcraft.config import SegCraftConfig, parse_config
 from segcraft.data import list_image_files
 from segcraft.models import create_model
 from segcraft.video import (
+    copy_video_file,
     is_video_file,
     mux_audio_from_source,
     probe_video,
     verify_video,
+    write_side_by_side_video,
     write_video_from_images,
 )
 
@@ -106,6 +108,7 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
     fps = float(video_info["fps"] or cfg.predict.video_fps)
     source_width, source_height = video_info["size"]
     video_path = _prediction_video_path(cfg, output_dir)
+    original_video = copy_video_file(input_path, _original_video_path(input_path, output_dir))
 
     cap = cv2.VideoCapture(str(input_path))
     if not cap.isOpened():
@@ -184,6 +187,7 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
         raise ValueError(f"No frames could be read from video: {input_path}")
 
     overlay_video = None
+    comparison_video = None
     audio = {"status": "disabled", "preserved": False}
     if cfg.predict.save_video:
         if cfg.predict.preserve_audio:
@@ -200,16 +204,27 @@ def _run_video_prediction(cfg: SegCraftConfig, input_path: Path) -> dict[str, An
             "codec": codec,
             "audio": audio,
         }
+        comparison_video = write_side_by_side_video(
+            original_video["video_path"],
+            video_path,
+            output_dir / "comparison.mp4",
+            fps=fps,
+            codec=codec,
+            left_label="Original dashcam",
+            right_label="Semantic segmentation overlay",
+        )
 
     summary = {
         "status": "completed",
         "input_type": "video",
         "device": str(device),
         "source_video": video_info,
+        "original_video": original_video,
         "frames_processed": frames_processed,
         "class_summary": _finalize_class_totals(class_totals),
         "sample_outputs": samples,
         "overlay_video": overlay_video,
+        "comparison_video": comparison_video,
     }
     _write_prediction_summary(output_dir, summary, outputs=samples)
     return summary
@@ -509,6 +524,11 @@ def _prediction_video_path(cfg: SegCraftConfig, output_dir: Path) -> Path:
     if not video_path.suffix:
         video_path = video_path.with_suffix(".mp4")
     return video_path
+
+
+def _original_video_path(input_path: Path, output_dir: Path) -> Path:
+    suffix = input_path.suffix if input_path.suffix else ".mp4"
+    return output_dir / f"original{suffix.lower()}"
 
 
 def _silent_video_path(video_path: Path) -> Path:

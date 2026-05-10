@@ -93,11 +93,15 @@ Run prediction:
 segcraft predict --config configs/base.yaml --preset configs/presets/fast_dev.yaml --local configs/local.yaml
 ```
 
-For video input, the command writes a new annotated overlay video to
-`outputs/demo_predictions/overlay.mp4` at the source FPS. If `ffmpeg` is
-available and `predict.preserve_audio` is enabled, source audio is copied into
-the overlay video. `summary.json` records frame counts, video metadata, class
-coverage, and mean/max confidence for visible classes.
+For video input, the output folder contains:
+
+- `original.mp4`: a copy of the source dashcam clip used for prediction
+- `overlay.mp4`: the same video with semantic segmentation overlays and class/confidence metadata
+- `comparison.mp4`: original and processed videos side by side
+- `summary.json`: frame counts, video metadata, class coverage, and mean/max confidence values
+
+If `ffmpeg` is available and `predict.preserve_audio` is enabled, source audio
+is copied into `overlay.mp4`. The comparison video is written without audio.
 
 For image-folder input, SegCraft writes indexed mask PNGs under `masks/`,
 overlay JPGs under `overlays/`, an optional overlay video, and the same summary

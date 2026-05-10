@@ -3,7 +3,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.egg-info/
-data/
+/data/
 outputs/
 configs/local.yaml
 .ipynb_checkpoints/

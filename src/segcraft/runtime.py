@@ -90,12 +90,17 @@ def collect_runtime_diagnostics() -> dict[str, Any]:
         "python_version": platform.python_version(),
         "packages": {
             "segcraft": _version("segcraft"),
+            "numpy": _version("numpy"),
             "torch": _version("torch"),
             "torchvision": _version("torchvision"),
             "opencv-python": _version("opencv-python"),
             "fastapi": _version("fastapi"),
             "uvicorn": _version("uvicorn"),
             "transformers": _version("transformers"),
+        },
+        "imports": {
+            "numpy": _import_report("numpy"),
+            "cv2": _import_report("cv2"),
         },
     }
     try:
@@ -118,6 +123,25 @@ def format_runtime_diagnostics(report: dict[str, Any]) -> str:
     packages = report.get("packages", {})
     for name in sorted(packages):
         lines.append(f"  {name}: {packages[name] or 'not installed'}")
+
+    imports = report.get("imports", {})
+    if imports:
+        lines.append("Import checks:")
+        import_failures = False
+        for name in sorted(imports):
+            details = imports[name]
+            if details.get("ok"):
+                version = details.get("version")
+                suffix = f" ({version})" if version else ""
+                lines.append(f"  {name}: ok{suffix}")
+            else:
+                import_failures = True
+                lines.append(f"  {name}: failed ({details.get('error', 'unknown error')})")
+        if import_failures:
+            lines.append(
+                'Import note: recreate the environment or run `python -m pip install --force-reinstall '
+                '"numpy>=1.26,<2" "opencv-python>=4.8,<4.12"`.'
+            )
 
     torch_report = report.get("torch", {})
     if not torch_report.get("installed"):
@@ -145,6 +169,20 @@ def _version(distribution: str) -> str | None:
         return metadata.version(distribution)
     except metadata.PackageNotFoundError:
         return None
+
+
+def _import_report(module_name: str) -> dict[str, Any]:
+    try:
+        module = __import__(module_name)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+    return {
+        "ok": True,
+        "version": getattr(module, "__version__", None),
+    }
 
 
 def _cuda_available(torch: Any) -> bool:

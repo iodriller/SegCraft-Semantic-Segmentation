@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## [0.1.4] - 2026-05-11
+
+### Changed
+- `segcraft doctor` now reports NumPy/OpenCV import failures such as `numpy.core.multiarray failed to import`.
+- The web/video extras cap `opencv-python` below 4.12 to stay aligned with the NumPy 1.x runtime range.
+- README install commands use `python -m pip` and avoid assuming the Windows `py` launcher is installed.
+
 ## [0.1.3] - 2026-05-11
 
 ### Added

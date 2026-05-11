@@ -12,19 +12,27 @@ base Python can make pip upgrade unrelated packages and produce dependency
 conflicts.
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\activate
+python --version
+```
+
+If this opens the Microsoft Store or says Python was not found, install Python
+from <https://python.org> with `python.exe` on PATH, or run the commands from
+Anaconda Prompt.
+
+```powershell
+python -m venv segcraft-env
+.\segcraft-env\Scripts\activate
 python -m pip install --upgrade pip
 ```
 
 ```bash
-pip install segcraft
+python -m pip install segcraft
 ```
 
 For the browser UI from PyPI:
 
 ```bash
-pip install "segcraft[web]"
+python -m pip install "segcraft[web]"
 segcraft doctor
 segcraft-web
 ```
@@ -32,16 +40,16 @@ segcraft-web
 Other extras:
 
 ```bash
-pip install "segcraft[torch]"                    # prediction/training with TorchVision
-pip install "segcraft[torch,smp]"                # segmentation-models-pytorch
-pip install "segcraft[torch,transformers]"       # Hugging Face segmentation models
-pip install "segcraft[torch,transformers,video]" # video files and YouTube helpers
+python -m pip install "segcraft[torch]"                    # prediction/training with TorchVision
+python -m pip install "segcraft[torch,smp]"                # segmentation-models-pytorch
+python -m pip install "segcraft[torch,transformers]"       # Hugging Face segmentation models
+python -m pip install "segcraft[torch,transformers,video]" # video files and YouTube helpers
 ```
 
 From a checkout:
 
 ```bash
-pip install -e ".[web,dev]"
+python -m pip install -e ".[web,dev]"
 ```
 
 For NVIDIA GPUs, install the CUDA-enabled PyTorch wheel that matches your
@@ -52,9 +60,10 @@ segcraft doctor
 ```
 
 `segcraft doctor` reports the Python executable, Torch version, CUDA build,
-CUDA availability, and visible GPU names. If it reports `CUDA available: False`,
-launch SegCraft from the environment where Torch can see CUDA, or keep
-`runtime.device: auto` so SegCraft falls back to CPU instead of failing.
+CUDA availability, visible GPU names, and NumPy/OpenCV import checks. If it
+reports `CUDA available: False`, launch SegCraft from the environment where
+Torch can see CUDA, or keep `runtime.device: auto` so SegCraft falls back to CPU
+instead of failing.
 
 ## CLI
 
@@ -152,7 +161,7 @@ the same summary metadata.
 ## Development
 
 ```bash
-pip install -e ".[web,dev]"
+python -m pip install -e ".[web,dev]"
 pytest
 python -m build
 twine check dist/*

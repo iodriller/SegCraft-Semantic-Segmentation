@@ -20,6 +20,17 @@ def test_packaged_preset_name_loads_outside_source_tree(tmp_path, monkeypatch):
     assert "pascal_video" in list_available_presets()
 
 
+def test_packaged_video_presets_include_fast_and_quality_options(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    names = set(list_available_presets())
+
+    assert "pascal_fast_video" in names
+    assert "pascal_quality_video" in names
+    assert "cityscapes_quality_video" in names
+    assert "ade20k_quality_video" in names
+
+
 def test_cli_accepts_doctor_mode():
     args = build_parser().parse_args(["doctor"])
 

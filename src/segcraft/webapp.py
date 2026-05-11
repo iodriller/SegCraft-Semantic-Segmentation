@@ -10,14 +10,15 @@ from typing import Any
 
 from segcraft.config.loader import list_available_presets, load_and_validate_config
 from segcraft.cli.main import resolve_config_path
-from segcraft.prediction import run_prediction
+from segcraft.prediction import PredictionCancelled, run_prediction
 from segcraft.runtime import INSTALL_HINTS, collect_runtime_diagnostics
-from segcraft.video import download_youtube
+from segcraft.video import DownloadCancelled, download_youtube
 
 
 JOBS: dict[str, dict[str, Any]] = {}
 JOBS_LOCK = threading.RLock()
 DEFAULT_WORK_DIR = Path("outputs/web")
+DEFAULT_DOWNLOAD_CACHE_DIR = DEFAULT_WORK_DIR / "download_cache"
 DOWNLOADABLE_FILES = ("comparison.mp4", "overlay.mp4", "original.mp4", "summary.json")
 
 
@@ -92,6 +93,7 @@ def create_app():
             job_id,
             id=job_id,
             status="queued",
+            cancel_requested=False,
             progress={"stage": "queued", "completed": 0, "total": None, "percent": 0, "message": "Queued"},
             output_dir=str(output_dir),
             downloads={},
@@ -104,6 +106,25 @@ def create_app():
         job = _get_job(job_id)
         job["downloads"] = _download_links(job_id)
         return job
+
+    @app.post("/jobs/{job_id}/cancel")
+    def cancel_job(job_id: str) -> dict[str, Any]:
+        job = _get_job(job_id)
+        if job.get("status") in {"completed", "failed", "canceled"}:
+            return {"job_id": job_id, "status": job.get("status", "unknown")}
+        _set_job(
+            job_id,
+            status="canceling",
+            cancel_requested=True,
+            progress={
+                "stage": "canceling",
+                "completed": 0,
+                "total": None,
+                "percent": None,
+                "message": "Stopping job",
+            },
+        )
+        return {"job_id": job_id, "status": "canceling"}
 
     @app.get("/jobs/{job_id}/download/{filename}")
     def download(job_id: str, filename: str):
@@ -123,6 +144,7 @@ def _run_job(params: dict[str, Any]) -> None:
     job_id = params["job_id"]
     try:
         _set_job(job_id, status="running")
+        _raise_if_job_cancelled(job_id)
         input_path = params.get("input_path")
         if params.get("youtube_url"):
             _set_job(
@@ -135,13 +157,27 @@ def _run_job(params: dict[str, Any]) -> None:
                     "message": "Downloading source video",
                 },
             )
-            input_path = str(download_youtube(params["youtube_url"], params["download_path"]))
+            input_path = str(
+                download_youtube(
+                    params["youtube_url"],
+                    params["download_path"],
+                    cache_dir=DEFAULT_DOWNLOAD_CACHE_DIR,
+                    should_stop=lambda: _job_cancel_requested(job_id),
+                )
+            )
+        _raise_if_job_cancelled(job_id)
 
         cfg = _job_config(params, input_path)
-        summary = run_prediction(cfg, progress_callback=lambda event: _set_job(job_id, progress=event))
+        summary = run_prediction(
+            cfg,
+            progress_callback=lambda event: _set_job(job_id, progress=event),
+            should_stop=lambda: _job_cancel_requested(job_id),
+        )
+        _raise_if_job_cancelled(job_id)
         _set_job(
             job_id,
             status="completed",
+            cancel_requested=False,
             summary=summary,
             progress={
                 "stage": "completed",
@@ -151,10 +187,25 @@ def _run_job(params: dict[str, Any]) -> None:
                 "message": "Prediction complete",
             },
         )
+    except (DownloadCancelled, PredictionCancelled, _JobCancelled) as exc:
+        _set_job(
+            job_id,
+            status="canceled",
+            cancel_requested=False,
+            error=str(exc),
+            progress={
+                "stage": "canceled",
+                "completed": 0,
+                "total": None,
+                "percent": None,
+                "message": "Job canceled",
+            },
+        )
     except Exception as exc:  # pragma: no cover - exercised by real app failures
         _set_job(
             job_id,
             status="failed",
+            cancel_requested=False,
             error=str(exc),
             progress={
                 "stage": "failed",
@@ -204,6 +255,20 @@ def _set_job(job_id: str, **updates: Any) -> None:
         job.update(updates)
 
 
+def _job_cancel_requested(job_id: str) -> bool:
+    with JOBS_LOCK:
+        return bool(JOBS.get(job_id, {}).get("cancel_requested"))
+
+
+class _JobCancelled(RuntimeError):
+    pass
+
+
+def _raise_if_job_cancelled(job_id: str) -> None:
+    if _job_cancel_requested(job_id):
+        raise _JobCancelled("Job was canceled.")
+
+
 def _get_job(job_id: str) -> dict[str, Any]:
     with JOBS_LOCK:
         if job_id not in JOBS:
@@ -249,6 +314,7 @@ def _index_html() -> str:
     .hint { color: #6d736c; font-size: 13px; font-weight: 500; }
     .runtime { margin: 0 0 16px; font-size: 14px; }
     button { border: 0; border-radius: 6px; background: #176a5f; color: white; padding: 11px 14px; font: inherit; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #7a322d; }
     button:disabled { background: #8a9a95; cursor: wait; }
     .bar { height: 12px; background: #e7eae4; border-radius: 999px; overflow: hidden; }
     .fill { width: 0%; height: 100%; background: #cf8a28; transition: width .25s ease; }
@@ -279,7 +345,7 @@ def _index_html() -> str:
       <label>Image width <input name="image_width" type="number" min="32" step="1" value="640"></label>
       <label>Config path <input name="config_path" type="text" placeholder="configs/base.yaml or leave blank"></label>
       <label><span>Preserve audio</span><select name="preserve_audio"><option value="true">true</option><option value="false">false</option></select></label>
-      <div class="full"><button id="submit" type="submit">Start job</button></div>
+      <div class="full row"><button id="submit" type="submit">Start job</button><button id="cancel" class="secondary" type="button" disabled>Stop</button></div>
     </form>
     <section class="panel" style="margin-top:16px">
       <div class="row"><strong id="status">Idle</strong><span id="percent">0%</span></div>
@@ -291,6 +357,7 @@ def _index_html() -> str:
   <script>
     const form = document.getElementById('job-form');
     const submit = document.getElementById('submit');
+    const cancel = document.getElementById('cancel');
     const statusEl = document.getElementById('status');
     const percentEl = document.getElementById('percent');
     const fillEl = document.getElementById('fill');
@@ -298,6 +365,7 @@ def _index_html() -> str:
     const downloadsEl = document.getElementById('downloads');
     const runtimeEl = document.getElementById('runtime');
     let timer = null;
+    let currentJobId = null;
 
     loadRuntime();
 
@@ -312,8 +380,17 @@ def _index_html() -> str:
         return;
       }
       const payload = await response.json();
-      poll(payload.job_id);
-      timer = setInterval(() => poll(payload.job_id), 1000);
+      currentJobId = payload.job_id;
+      cancel.disabled = false;
+      poll(currentJobId);
+      timer = setInterval(() => poll(currentJobId), 1000);
+    });
+
+    cancel.addEventListener('click', async () => {
+      if (!currentJobId) return;
+      cancel.disabled = true;
+      await fetch(`/jobs/${currentJobId}/cancel`, { method: 'POST' });
+      messageEl.textContent = 'Stopping job...';
     });
 
     async function poll(jobId) {
@@ -332,9 +409,11 @@ def _index_html() -> str:
         link.textContent = `Download ${name}`;
         downloadsEl.appendChild(link);
       });
-      if (job.status === 'completed' || job.status === 'failed') {
+      if (job.status === 'completed' || job.status === 'failed' || job.status === 'canceled') {
         clearInterval(timer);
         submit.disabled = false;
+        cancel.disabled = true;
+        currentJobId = null;
       }
     }
 

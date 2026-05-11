@@ -70,7 +70,8 @@ segcraft-web
 Open `http://127.0.0.1:8000`. The UI accepts either a video upload or a
 YouTube URL, lets you choose a preset or type a custom preset path/name, shows
 job progress, shows the active Torch/CUDA runtime, and exposes downloads for
-the generated outputs.
+the generated outputs. YouTube downloads are cached under `outputs/web` by URL
+and format, and running jobs can be stopped from the UI.
 
 ## Notebooks
 
@@ -91,15 +92,28 @@ Preset names work in the CLI, Python API, and web app:
 - `fast_dev`: tiny CPU training run.
 - `quality`: longer training settings with scheduler and metrics.
 - `binary_quickstart`: binary foreground/background setup.
+- `pascal_fast_video`: faster TorchVision PASCAL/VOC video prediction.
 - `pascal_video`: TorchVision PASCAL/VOC video prediction.
+- `pascal_quality_video`: larger TorchVision PASCAL/VOC video prediction.
 - `cityscapes_video`: SegFormer Cityscapes video prediction.
+- `cityscapes_quality_video`: larger SegFormer Cityscapes video prediction.
 - `cpu_video_demo`: short Cityscapes CPU demo settings.
 - `ade20k_video`: SegFormer ADE20K video prediction.
+- `ade20k_quality_video`: larger SegFormer ADE20K video prediction.
 - `smp_unet_resnet34`: SMP Unet training setup.
 
 `task.num_classes` controls trainable model heads. `task.class_names` only
 controls display names; if labels are missing or do not match the model,
 SegCraft falls back to `class_<id>` names during prediction.
+
+For more pretrained models, use Hugging Face semantic-segmentation model IDs
+with `model.backend: transformers`, TorchVision segmentation model names with
+`model.backend: torchvision`, or SMP architectures/encoders with
+`model.backend: smp`:
+
+- Hugging Face image segmentation models: <https://huggingface.co/models?pipeline_tag=image-segmentation>
+- TorchVision semantic segmentation weights: <https://docs.pytorch.org/vision/stable/models.html#semantic-segmentation>
+- Segmentation Models PyTorch encoders: <https://smp.readthedocs.io/en/stable/encoders.html>
 
 ## Python API
 

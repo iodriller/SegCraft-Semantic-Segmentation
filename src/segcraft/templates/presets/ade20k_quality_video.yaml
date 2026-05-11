@@ -1,0 +1,29 @@
+task:
+  type: multiclass
+  num_classes: 150
+  class_names: []
+  ignore_index: 255
+  background_class_id:
+
+model:
+  name: nvidia/segformer-b2-finetuned-ade-512-512
+  backend: transformers
+  pretrained: true
+
+data:
+  image_size: [512, 512]
+  batch_size: 1
+  num_workers: 0
+
+predict:
+  overlay_alpha: 0.36
+  video_max_seconds: 30
+  video_frame_stride: 1
+  display:
+    palette: vivid
+    show_panel: true
+    show_floating_labels: false
+    show_confidence: true
+    show_percentages: true
+    max_classes: 10
+    panel_position: top_right

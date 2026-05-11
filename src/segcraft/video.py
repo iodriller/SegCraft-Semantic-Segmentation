@@ -2,28 +2,55 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from segcraft.data import list_image_files
 from segcraft.runtime import INSTALL_HINTS
 
 
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v")
+DEFAULT_YOUTUBE_FORMAT = "mp4[height<=360]/mp4/best"
+
+
+class DownloadCancelled(RuntimeError):
+    """Raised when a cancellable download is stopped by the caller."""
 
 
 def download_youtube(
     url: str,
     output_path: str | Path,
     *,
-    format_selector: str = "mp4[height<=360]/mp4/best",
+    format_selector: str = DEFAULT_YOUTUBE_FORMAT,
+    cache_dir: str | Path | None = None,
+    use_cache: bool = True,
+    should_stop: Callable[[], bool] | None = None,
 ) -> Path:
     """Download a YouTube video with yt-dlp and return the output path."""
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    metadata = {"url": url, "format_selector": format_selector}
+    output_metadata_path = _download_metadata_path(output_path)
+    if use_cache and _download_matches(output_path, output_metadata_path, metadata):
+        return output_path
+
+    cache_path = None
+    cache_metadata_path = None
+    if use_cache and cache_dir is not None:
+        cache_path = _cached_download_path(cache_dir, url, format_selector, output_path.suffix or ".mp4")
+        cache_metadata_path = _download_metadata_path(cache_path)
+        if _download_matches(cache_path, cache_metadata_path, metadata):
+            shutil.copy2(cache_path, output_path)
+            _write_json(output_metadata_path, metadata)
+            return output_path
+
     command = [
         sys.executable,
         "-m",
@@ -34,8 +61,70 @@ def download_youtube(
         str(output_path),
         url,
     ]
-    subprocess.run(command, check=True)
+    _run_download(command, should_stop=should_stop)
+    _write_json(output_metadata_path, metadata)
+
+    if cache_path is not None and cache_metadata_path is not None and _usable_file(output_path):
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(output_path, cache_path)
+        _write_json(cache_metadata_path, metadata)
+
     return output_path
+
+
+def _run_download(command: list[str], *, should_stop: Callable[[], bool] | None = None) -> None:
+    if should_stop is None:
+        subprocess.run(command, check=True)
+        return
+
+    process = subprocess.Popen(command)
+    while True:
+        return_code = process.poll()
+        if return_code is not None:
+            if return_code != 0:
+                raise subprocess.CalledProcessError(return_code, command)
+            return
+        if should_stop():
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:  # pragma: no cover - depends on yt-dlp process state
+                process.kill()
+                process.wait()
+            raise DownloadCancelled("Download was canceled.")
+        time.sleep(0.5)
+
+
+def _cached_download_path(cache_dir: str | Path, url: str, format_selector: str, suffix: str) -> Path:
+    key = hashlib.sha256(f"{url}\n{format_selector}".encode("utf-8")).hexdigest()[:24]
+    safe_suffix = suffix if suffix.startswith(".") else f".{suffix}"
+    return Path(cache_dir) / f"{key}{safe_suffix}"
+
+
+def _download_metadata_path(video_path: Path) -> Path:
+    return video_path.with_name(f"{video_path.name}.segcraft-download.json")
+
+
+def _download_matches(video_path: Path, metadata_path: Path, expected: dict[str, str]) -> bool:
+    if not _usable_file(video_path) or not metadata_path.exists():
+        return False
+    try:
+        actual = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return all(actual.get(key) == value for key, value in expected.items())
+
+
+def _usable_file(path: Path) -> bool:
+    try:
+        return path.exists() and path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
 def is_video_file(path: str | Path) -> bool:

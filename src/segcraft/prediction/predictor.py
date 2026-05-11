@@ -25,6 +25,11 @@ IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 TOTAL_KEY = -1
 ProgressCallback = Callable[[dict[str, Any]], None]
+CancelCallback = Callable[[], bool]
+
+
+class PredictionCancelled(RuntimeError):
+    """Raised when prediction is canceled by the caller."""
 
 CLASS_COLOR_OVERRIDES = {
     "road": (90, 80, 255),
@@ -67,14 +72,25 @@ def run_prediction(
     config: Mapping[str, Any] | SegCraftConfig,
     *,
     progress_callback: ProgressCallback | None = None,
+    should_stop: CancelCallback | None = None,
 ) -> dict[str, Any]:
     cfg = parse_config(config)
     input_path = Path(cfg.predict.input_path)
     if not input_path.exists():
         raise FileNotFoundError(f"Prediction input path does not exist: {input_path}")
     if is_video_file(input_path):
-        return _run_video_prediction(cfg, input_path, progress_callback=progress_callback)
-    return _run_image_prediction(cfg, input_path, progress_callback=progress_callback)
+        return _run_video_prediction(
+            cfg,
+            input_path,
+            progress_callback=progress_callback,
+            should_stop=should_stop,
+        )
+    return _run_image_prediction(
+        cfg,
+        input_path,
+        progress_callback=progress_callback,
+        should_stop=should_stop,
+    )
 
 
 def _run_image_prediction(
@@ -82,6 +98,7 @@ def _run_image_prediction(
     input_path: Path,
     *,
     progress_callback: ProgressCallback | None = None,
+    should_stop: CancelCallback | None = None,
 ) -> dict[str, Any]:
     image_paths = list_image_files(input_path)
     if not image_paths:
@@ -109,6 +126,7 @@ def _run_image_prediction(
     class_totals: dict[int, dict[str, Any]] = {}
     with torch.inference_mode():
         for frame_index, image_path in enumerate(image_paths):
+            _raise_if_cancelled(should_stop)
             artifact = _predict_one(
                 image_path=image_path,
                 frame_index=frame_index,
@@ -149,6 +167,7 @@ def _run_image_prediction(
         "sample_outputs": artifacts[:5],
     }
     if cfg.predict.save_video:
+        _raise_if_cancelled(should_stop)
         _emit_progress(
             progress_callback,
             stage="writing_video",
@@ -178,6 +197,7 @@ def _run_video_prediction(
     input_path: Path,
     *,
     progress_callback: ProgressCallback | None = None,
+    should_stop: CancelCallback | None = None,
 ) -> dict[str, Any]:
     output_dir = Path(cfg.predict.output_path)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -256,6 +276,7 @@ def _run_video_prediction(
     try:
         with torch.inference_mode():
             while True:
+                _raise_if_cancelled(should_stop)
                 if max_source_frames is not None and source_frame_index >= max_source_frames:
                     break
                 ok, frame = cap.read()
@@ -328,6 +349,7 @@ def _run_video_prediction(
     original_video = None
     audio = {"status": "disabled", "preserved": False}
     if cfg.predict.save_video:
+        _raise_if_cancelled(should_stop)
         _emit_progress(
             progress_callback,
             stage="writing_video",
@@ -919,6 +941,11 @@ def _emit_progress(
             "message": message,
         }
     )
+
+
+def _raise_if_cancelled(should_stop: CancelCallback | None) -> None:
+    if should_stop is not None and should_stop():
+        raise PredictionCancelled("Prediction was canceled.")
 
 
 def _resolve_device(requested: str, torch: Any) -> Any:

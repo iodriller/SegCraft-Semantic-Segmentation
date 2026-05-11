@@ -1,0 +1,22 @@
+model:
+  name: lraspp_mobilenet_v3_large
+  backend: torchvision
+  pretrained: true
+
+data:
+  image_size: [360, 640]
+  batch_size: 1
+  num_workers: 0
+
+predict:
+  overlay_alpha: 0.42
+  video_max_seconds: 30
+  video_frame_stride: 1
+  display:
+    palette: vivid
+    show_panel: true
+    show_floating_labels: false
+    show_confidence: true
+    show_percentages: true
+    max_classes: 6
+    panel_position: top_right

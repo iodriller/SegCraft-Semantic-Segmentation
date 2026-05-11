@@ -31,6 +31,19 @@ def test_packaged_video_presets_include_fast_and_quality_options(tmp_path, monke
     assert "ade20k_quality_video" in names
 
 
+def test_packaged_quality_presets_load_outside_source_tree(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    with resolve_config_path() as config_path:
+        pascal = load_and_validate_config(config_path, preset_path="pascal_quality_video")
+        cityscapes = load_and_validate_config(config_path, preset_path="cityscapes_quality_video")
+
+    assert pascal["model"]["name"] == "deeplabv3_resnet101"
+    assert pascal["data"]["image_size"] == [512, 896]
+    assert cityscapes["model"]["name"] == "nvidia/segformer-b2-finetuned-cityscapes-1024-1024"
+    assert cityscapes["task"]["num_classes"] == 19
+
+
 def test_cli_accepts_doctor_mode():
     args = build_parser().parse_args(["doctor"])
 

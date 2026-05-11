@@ -66,3 +66,59 @@ def test_download_youtube_reuses_cache_file(tmp_path, monkeypatch):
 
     assert result == output
     assert output.read_bytes() == b"cached video"
+
+
+def test_download_youtube_writes_metadata_and_populates_cache(tmp_path, monkeypatch):
+    output = tmp_path / "job" / "youtube.mp4"
+    cache_dir = tmp_path / "cache"
+
+    def fake_run(command, *, should_stop=None):
+        output_path = command[command.index("-o") + 1]
+        assert should_stop is None
+        with open(output_path, "wb") as handle:
+            handle.write(b"fresh video")
+
+    monkeypatch.setattr(video, "_run_download", fake_run)
+
+    result = video.download_youtube(
+        "https://example.com/fresh",
+        output,
+        format_selector="mp4",
+        cache_dir=cache_dir,
+    )
+    cached = video._cached_download_path(cache_dir, "https://example.com/fresh", "mp4", ".mp4")
+
+    assert result == output
+    assert output.read_bytes() == b"fresh video"
+    assert cached.read_bytes() == b"fresh video"
+    assert json.loads(video._download_metadata_path(output).read_text(encoding="utf-8")) == {
+        "url": "https://example.com/fresh",
+        "format_selector": "mp4",
+    }
+    assert json.loads(video._download_metadata_path(cached).read_text(encoding="utf-8")) == {
+        "url": "https://example.com/fresh",
+        "format_selector": "mp4",
+    }
+
+
+def test_run_download_terminates_when_cancelled(monkeypatch):
+    class SlowProcess:
+        terminated = False
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout=None):
+            return 0
+
+    process = SlowProcess()
+    monkeypatch.setattr(video.subprocess, "Popen", lambda _command: process)
+
+    try:
+        video._run_download(["yt-dlp"], should_stop=lambda: True)
+        assert False, "expected DownloadCancelled"
+    except video.DownloadCancelled:
+        assert process.terminated is True

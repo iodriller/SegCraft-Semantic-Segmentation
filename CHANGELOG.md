@@ -2,10 +2,13 @@
 
 ## Unreleased
 
+## [0.1.3] - 2026-05-11
+
 ### Added
 - Web job stop button and cancel endpoint for downloads/prediction.
 - Shared YouTube download cache keyed by URL and yt-dlp format selector.
 - Fast/quality PASCAL video presets and quality Cityscapes/ADE20K SegFormer presets.
+- Additional tests for download caching, cancellation, web job state, and packaged presets.
 
 ## [0.1.2] - 2026-05-11
 

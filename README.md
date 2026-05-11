@@ -21,14 +21,21 @@ python -m pip install --upgrade pip
 pip install segcraft
 ```
 
-Install only the extras you need:
+For the browser UI from PyPI:
+
+```bash
+pip install "segcraft[web]"
+segcraft doctor
+segcraft-web
+```
+
+Other extras:
 
 ```bash
 pip install "segcraft[torch]"                    # prediction/training with TorchVision
 pip install "segcraft[torch,smp]"                # segmentation-models-pytorch
 pip install "segcraft[torch,transformers]"       # Hugging Face segmentation models
 pip install "segcraft[torch,transformers,video]" # video files and YouTube helpers
-pip install "segcraft[web]"                      # FastAPI UI with video + default model backends
 ```
 
 From a checkout:

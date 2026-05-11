@@ -119,5 +119,5 @@ twine check dist/*
 
 Publishing uses `.github/workflows/release.yml` with GitHub trusted publishing.
 Configure the PyPI/TestPyPI publisher for owner `iodriller`, repository
-`SegCraft-Semantic-Segmentation`, workflow `release.yml`, and no environment,
-then run the workflow manually for the target repository.
+`SegCraft-Semantic-Segmentation`, workflow `release.yml`, and environment
+`pypi`, then run the workflow manually for the target repository.

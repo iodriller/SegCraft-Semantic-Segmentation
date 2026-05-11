@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from segcraft.config import DataConfig
+from segcraft.runtime import INSTALL_HINTS
 
 from .discovery import ImageMaskPair, pair_image_masks
 
@@ -87,7 +88,7 @@ def _require_image_stack() -> None:
         import torch  # noqa: F401
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "SegmentationDataset requires the image stack. Install with `pip install -e .[torch]`."
+            f"SegmentationDataset requires the image stack. {INSTALL_HINTS['torch']}"
         ) from exc
 
 

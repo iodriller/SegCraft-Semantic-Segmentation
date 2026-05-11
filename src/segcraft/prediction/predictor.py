@@ -10,6 +10,7 @@ from typing import Any, Callable, Mapping
 from segcraft.config import SegCraftConfig, parse_config
 from segcraft.data import list_image_files
 from segcraft.models import create_model
+from segcraft.runtime import INSTALL_HINTS, resolve_torch_device
 from segcraft.video import (
     is_video_file,
     mux_audio_from_source,
@@ -921,11 +922,7 @@ def _emit_progress(
 
 
 def _resolve_device(requested: str, torch: Any) -> Any:
-    if requested == "auto":
-        requested = "cuda" if torch.cuda.is_available() else "cpu"
-    if requested == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError("runtime.device is 'cuda', but CUDA is not available")
-    return torch.device(requested)
+    return resolve_torch_device(requested, torch)
 
 
 def _create_model_on_device(cfg: SegCraftConfig, torch: Any) -> tuple[Any, Any, str | None]:
@@ -1011,7 +1008,7 @@ def _torch() -> Any:
         import torch
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "Prediction requires PyTorch and TorchVision. Install with `pip install -e .[torch]`."
+            f"Prediction requires PyTorch and TorchVision. {INSTALL_HINTS['torch']}"
         ) from exc
     return torch
 
@@ -1021,7 +1018,7 @@ def _pil() -> Any:
         from PIL import Image
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "Prediction requires Pillow. Install with `pip install -e .[torch]`."
+            f"Prediction requires Pillow. {INSTALL_HINTS['torch']}"
         ) from exc
     return Image
 
@@ -1031,7 +1028,7 @@ def _np() -> Any:
         import numpy as np
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "Prediction requires NumPy. Install with `pip install -e .[torch]`."
+            f"Prediction requires NumPy. {INSTALL_HINTS['torch']}"
         ) from exc
     return np
 
@@ -1041,6 +1038,6 @@ def _cv2() -> Any:
         import cv2
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "Video prediction requires OpenCV. Install with `pip install -e .[video]`."
+            f"Video prediction requires OpenCV. {INSTALL_HINTS['video']}"
         ) from exc
     return cv2

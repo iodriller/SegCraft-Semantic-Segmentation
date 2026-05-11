@@ -11,6 +11,7 @@ from typing import Any
 from segcraft.config import SegCraftConfig
 from segcraft.data import SegmentationDataset
 from segcraft.models import create_model
+from segcraft.runtime import INSTALL_HINTS, resolve_torch_device
 
 
 def run_training(config: SegCraftConfig) -> dict[str, Any]:
@@ -470,11 +471,7 @@ def _missing_data_summary(config: SegCraftConfig, split: str) -> dict[str, Any]:
 
 
 def _resolve_device(requested: str, torch: Any) -> Any:
-    if requested == "auto":
-        requested = "cuda" if torch.cuda.is_available() else "cpu"
-    if requested == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError("runtime.device is 'cuda', but CUDA is not available")
-    return torch.device(requested)
+    return resolve_torch_device(requested, torch)
 
 
 def _set_seed(seed: int, torch: Any) -> None:
@@ -493,6 +490,6 @@ def _torch() -> Any:
         import torch
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "Training and evaluation require PyTorch. Install with `pip install -e .[torch]`."
+            f"Training and evaluation require PyTorch. {INSTALL_HINTS['torch']}"
         ) from exc
     return torch

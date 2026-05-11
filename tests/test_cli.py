@@ -1,4 +1,4 @@
-from segcraft.cli.main import resolve_config_path
+from segcraft.cli.main import build_parser, resolve_config_path
 from segcraft.config.loader import list_available_presets, load_and_validate_config
 
 
@@ -18,3 +18,9 @@ def test_packaged_preset_name_loads_outside_source_tree(tmp_path, monkeypatch):
 
     assert config["data"]["image_size"] == [360, 640]
     assert "pascal_video" in list_available_presets()
+
+
+def test_cli_accepts_doctor_mode():
+    args = build_parser().parse_args(["doctor"])
+
+    assert args.mode == "doctor"

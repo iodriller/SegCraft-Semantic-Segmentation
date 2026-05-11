@@ -7,6 +7,16 @@ evaluating, and running image/video prediction from the same YAML setup.
 
 ## Install
 
+Use an isolated environment. Installing ML/video stacks into a global or Conda
+base Python can make pip upgrade unrelated packages and produce dependency
+conflicts.
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\activate
+python -m pip install --upgrade pip
+```
+
 ```bash
 pip install segcraft
 ```
@@ -18,17 +28,26 @@ pip install "segcraft[torch]"                    # prediction/training with Torc
 pip install "segcraft[torch,smp]"                # segmentation-models-pytorch
 pip install "segcraft[torch,transformers]"       # Hugging Face segmentation models
 pip install "segcraft[torch,transformers,video]" # video files and YouTube helpers
-pip install "segcraft[torch,transformers,video,app]" # optional FastAPI UI
+pip install "segcraft[web]"                      # FastAPI UI with video + default model backends
 ```
 
 From a checkout:
 
 ```bash
-pip install -e ".[torch,transformers,video,app,dev]"
+pip install -e ".[web,dev]"
 ```
 
 For NVIDIA GPUs, install the CUDA-enabled PyTorch wheel that matches your
-system from the PyTorch install page.
+system from the PyTorch install page, then run:
+
+```bash
+segcraft doctor
+```
+
+`segcraft doctor` reports the Python executable, Torch version, CUDA build,
+CUDA availability, and visible GPU names. If it reports `CUDA available: False`,
+launch SegCraft from the environment where Torch can see CUDA, or keep
+`runtime.device: auto` so SegCraft falls back to CPU instead of failing.
 
 ## CLI
 
@@ -50,7 +69,8 @@ segcraft-web
 
 Open `http://127.0.0.1:8000`. The UI accepts either a video upload or a
 YouTube URL, lets you choose a preset or type a custom preset path/name, shows
-job progress, and exposes downloads for the generated outputs.
+job progress, shows the active Torch/CUDA runtime, and exposes downloads for
+the generated outputs.
 
 ## Notebooks
 
@@ -111,7 +131,7 @@ the same summary metadata.
 ## Development
 
 ```bash
-pip install -e ".[dev]"
+pip install -e ".[web,dev]"
 pytest
 python -m build
 twine check dist/*

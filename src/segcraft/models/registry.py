@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 from segcraft.config import ModelConfig, TaskConfig
+from segcraft.runtime import INSTALL_HINTS
 
 
 TORCHVISION_ALIASES = {
@@ -117,7 +118,7 @@ def _create_torchvision_model(spec: Mapping[str, Any]) -> Any:
         from torchvision.models import segmentation
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "TorchVision models require optional dependencies. Install with `pip install -e .[torch]`."
+            f"TorchVision models require optional dependencies. {INSTALL_HINTS['torch']}"
         ) from exc
 
     factory_name = spec["factory"]
@@ -166,7 +167,7 @@ def _create_smp_model(spec: Mapping[str, Any]) -> Any:
         import segmentation_models_pytorch as smp
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "SMP models require optional dependencies. Install with `pip install -e .[torch,smp]`."
+            f"SMP models require optional dependencies. {INSTALL_HINTS['smp']}"
         ) from exc
 
     factory = getattr(smp, spec["factory"])
@@ -188,7 +189,7 @@ def _create_transformers_model(spec: Mapping[str, Any]) -> Any:
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
             "Transformers models require optional dependencies. "
-            "Install with `pip install -e .[torch,transformers]`."
+            f"{INSTALL_HINTS['transformers']}"
         ) from exc
 
     model_name = spec["factory"]

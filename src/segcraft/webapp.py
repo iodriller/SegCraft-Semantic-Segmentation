@@ -11,6 +11,7 @@ from typing import Any
 from segcraft.config.loader import list_available_presets, load_and_validate_config
 from segcraft.cli.main import resolve_config_path
 from segcraft.prediction import run_prediction
+from segcraft.runtime import INSTALL_HINTS, collect_runtime_diagnostics
 from segcraft.video import download_youtube
 
 
@@ -26,7 +27,7 @@ def create_app():
         from fastapi.responses import FileResponse, HTMLResponse
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "The web app requires optional dependencies. Install with `pip install -e .[app]`."
+            f"The web app requires optional dependencies. {INSTALL_HINTS['app']}"
         ) from exc
 
     app = FastAPI(title="SegCraft")
@@ -34,6 +35,10 @@ def create_app():
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         return _index_html()
+
+    @app.get("/runtime")
+    def runtime() -> dict[str, Any]:
+        return collect_runtime_diagnostics()
 
     @app.post("/jobs")
     async def create_job(
@@ -242,6 +247,7 @@ def _index_html() -> str:
     .source-box { border: 1px solid #d9ded6; border-radius: 8px; padding: 14px; background: #fbfbf8; }
     .full { grid-column: 1 / -1; }
     .hint { color: #6d736c; font-size: 13px; font-weight: 500; }
+    .runtime { margin: 0 0 16px; font-size: 14px; }
     button { border: 0; border-radius: 6px; background: #176a5f; color: white; padding: 11px 14px; font: inherit; font-weight: 700; cursor: pointer; }
     button:disabled { background: #8a9a95; cursor: wait; }
     .bar { height: 12px; background: #e7eae4; border-radius: 999px; overflow: hidden; }
@@ -255,6 +261,7 @@ def _index_html() -> str:
 <body>
   <main>
     <h1>SegCraft Video</h1>
+    <p id="runtime" class="runtime">Checking runtime...</p>
     <form id="job-form" class="grid">
       <section class="full">
         <h2>Source</h2>
@@ -289,7 +296,10 @@ def _index_html() -> str:
     const fillEl = document.getElementById('fill');
     const messageEl = document.getElementById('message');
     const downloadsEl = document.getElementById('downloads');
+    const runtimeEl = document.getElementById('runtime');
     let timer = null;
+
+    loadRuntime();
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -327,6 +337,27 @@ def _index_html() -> str:
         submit.disabled = false;
       }
     }
+
+    async function loadRuntime() {
+      try {
+        const response = await fetch('/runtime');
+        const runtime = await response.json();
+        const torch = runtime.torch || {};
+        if (!torch.installed) {
+          runtimeEl.textContent = 'Torch is not installed in this Python environment. Install segcraft[web] before running jobs.';
+          return;
+        }
+        const deviceNames = torch.device_names || [];
+        if (torch.cuda_available) {
+          runtimeEl.textContent = `Torch ${torch.torch_version}; CUDA ${torch.cuda_version}; ${deviceNames.join(', ') || 'CUDA device ready'}`;
+          return;
+        }
+        const cudaBuild = torch.cuda_version ? `CUDA build ${torch.cuda_version}` : 'CPU-only Torch build';
+        runtimeEl.textContent = `Torch ${torch.torch_version}; ${cudaBuild}; CUDA unavailable in ${runtime.python_executable}`;
+      } catch (error) {
+        runtimeEl.textContent = 'Runtime status unavailable.';
+      }
+    }
   </script>
 </body>
 </html>"""
@@ -348,7 +379,7 @@ def main() -> None:
         import uvicorn
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "The web app requires optional dependencies. Install with `pip install -e .[app]`."
+            f"The web app requires optional dependencies. {INSTALL_HINTS['app']}"
         ) from exc
 
     uvicorn.run("segcraft.webapp:create_app", factory=True, host="127.0.0.1", port=8000)

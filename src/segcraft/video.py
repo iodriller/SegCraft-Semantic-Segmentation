@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from segcraft.data import list_image_files
+from segcraft.runtime import INSTALL_HINTS
 
 
 VIDEO_EXTENSIONS = (".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v")
@@ -445,6 +446,6 @@ def _cv2() -> Any:
         import cv2
     except ModuleNotFoundError as exc:
         raise ModuleNotFoundError(
-            "Video helpers require OpenCV. Install with `pip install -e .[video]`."
+            f"Video helpers require OpenCV. {INSTALL_HINTS['video']}"
         ) from exc
     return cv2

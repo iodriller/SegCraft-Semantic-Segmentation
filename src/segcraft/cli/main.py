@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterator
 
 from segcraft import evaluate, load_config, predict, train
+from segcraft.runtime import collect_runtime_diagnostics, format_runtime_diagnostics
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -20,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "mode",
         nargs="?",
-        choices=["validate", "train", "evaluate", "predict"],
+        choices=["validate", "train", "evaluate", "predict", "doctor"],
         default="validate",
         help="Execution mode. Default is validate.",
     )
@@ -68,6 +69,10 @@ def resolve_config_path(config_path: Path | None = None) -> Iterator[Path]:
 def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.mode == "doctor":
+        print(format_runtime_diagnostics(collect_runtime_diagnostics()))
+        return
 
     with resolve_config_path(args.config) as config_path:
         config = load_config(config_path, preset_path=args.preset, local_path=args.local)

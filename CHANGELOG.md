@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## [0.1.2] - 2026-05-11
+
+### Added
+- `segcraft doctor` runtime diagnostics for Python, installed package versions, Torch CUDA build, CUDA availability, and visible GPU names.
+- Web app runtime endpoint and UI status line showing the active Torch/CUDA environment.
+- `web` extra for installing the FastAPI UI, video helpers, Torch/TorchVision, and default Transformers backend in one command.
+
+### Changed
+- CUDA device failures now include Python executable, Torch version, CUDA build, visible device count, and CPU fallback guidance.
+- Optional dependency ranges are capped for a calmer resolver result across NumPy, Pillow, Transformers, FastAPI, pytest, packaging, docutils, and rich.
+- Missing optional dependency messages now use package install commands instead of editable checkout commands.
+
 ## [0.1.1] - 2026-05-10
 
 ### Added

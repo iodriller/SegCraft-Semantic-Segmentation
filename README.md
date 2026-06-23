@@ -7,49 +7,32 @@ evaluating, and running image/video prediction from the same YAML setup.
 
 ## Install
 
-Use an isolated environment. Installing ML/video stacks into a global or Conda
-base Python can make pip upgrade unrelated packages and produce dependency
-conflicts.
+Use an isolated environment.
 
 ```powershell
-python --version
-```
-
-If this opens the Microsoft Store or says Python was not found, install Python
-from <https://python.org> with `python.exe` on PATH, or run the commands from
-Anaconda Prompt.
-
-```powershell
-python -m venv segcraft-env
-.\segcraft-env\Scripts\activate
+py -3.12 -m venv .venv
+.\.venv\Scripts\activate
 python -m pip install --upgrade pip
 ```
 
 ```bash
-python -m pip install segcraft
+pip install segcraft
 ```
 
-For the browser UI from PyPI:
+Install only the extras you need:
 
 ```bash
-python -m pip install "segcraft[web]"
-segcraft doctor
-segcraft-web
-```
-
-Other extras:
-
-```bash
-python -m pip install "segcraft[torch]"                    # prediction/training with TorchVision
-python -m pip install "segcraft[torch,smp]"                # segmentation-models-pytorch
-python -m pip install "segcraft[torch,transformers]"       # Hugging Face segmentation models
-python -m pip install "segcraft[torch,transformers,video]" # video files and YouTube helpers
+pip install "segcraft[torch]"                    # prediction/training with TorchVision
+pip install "segcraft[torch,smp]"                # segmentation-models-pytorch
+pip install "segcraft[torch,transformers]"       # Hugging Face segmentation models
+pip install "segcraft[torch,transformers,video]" # video files and YouTube helpers
+pip install "segcraft[web]"                      # FastAPI UI with video + default model backends
 ```
 
 From a checkout:
 
 ```bash
-python -m pip install -e ".[web,dev]"
+pip install -e ".[web,dev]"
 ```
 
 For NVIDIA GPUs, install the CUDA-enabled PyTorch wheel that matches your
@@ -60,10 +43,9 @@ segcraft doctor
 ```
 
 `segcraft doctor` reports the Python executable, Torch version, CUDA build,
-CUDA availability, visible GPU names, and NumPy/OpenCV import checks. If it
-reports `CUDA available: False`, launch SegCraft from the environment where
-Torch can see CUDA, or keep `runtime.device: auto` so SegCraft falls back to CPU
-instead of failing.
+CUDA availability, and visible GPU names. If it reports `CUDA available: False`,
+launch SegCraft from the environment where Torch can see CUDA, or keep
+`runtime.device: auto` so SegCraft falls back to CPU instead of failing.
 
 ## CLI
 
@@ -86,8 +68,7 @@ segcraft-web
 Open `http://127.0.0.1:8000`. The UI accepts either a video upload or a
 YouTube URL, lets you choose a preset or type a custom preset path/name, shows
 job progress, shows the active Torch/CUDA runtime, and exposes downloads for
-the generated outputs. YouTube downloads are cached under `outputs/web` by URL
-and format, and running jobs can be stopped from the UI.
+the generated outputs.
 
 ## Notebooks
 
@@ -108,28 +89,15 @@ Preset names work in the CLI, Python API, and web app:
 - `fast_dev`: tiny CPU training run.
 - `quality`: longer training settings with scheduler and metrics.
 - `binary_quickstart`: binary foreground/background setup.
-- `pascal_fast_video`: faster TorchVision PASCAL/VOC video prediction.
 - `pascal_video`: TorchVision PASCAL/VOC video prediction.
-- `pascal_quality_video`: larger TorchVision PASCAL/VOC video prediction.
 - `cityscapes_video`: SegFormer Cityscapes video prediction.
-- `cityscapes_quality_video`: larger SegFormer Cityscapes video prediction.
 - `cpu_video_demo`: short Cityscapes CPU demo settings.
 - `ade20k_video`: SegFormer ADE20K video prediction.
-- `ade20k_quality_video`: larger SegFormer ADE20K video prediction.
 - `smp_unet_resnet34`: SMP Unet training setup.
 
 `task.num_classes` controls trainable model heads. `task.class_names` only
 controls display names; if labels are missing or do not match the model,
 SegCraft falls back to `class_<id>` names during prediction.
-
-For more pretrained models, use Hugging Face semantic-segmentation model IDs
-with `model.backend: transformers`, TorchVision segmentation model names with
-`model.backend: torchvision`, or SMP architectures/encoders with
-`model.backend: smp`:
-
-- Hugging Face image segmentation models: <https://huggingface.co/models?pipeline_tag=image-segmentation>
-- TorchVision semantic segmentation weights: <https://docs.pytorch.org/vision/stable/models.html#semantic-segmentation>
-- Segmentation Models PyTorch encoders: <https://smp.readthedocs.io/en/stable/encoders.html>
 
 ## Python API
 
@@ -161,7 +129,7 @@ the same summary metadata.
 ## Development
 
 ```bash
-python -m pip install -e ".[web,dev]"
+pip install -e ".[web,dev]"
 pytest
 python -m build
 twine check dist/*

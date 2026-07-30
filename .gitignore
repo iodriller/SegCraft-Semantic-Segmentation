@@ -10,3 +10,8 @@ outputs/
 /legacy/
 configs/local.yaml
 .ipynb_checkpoints/
+
+# Local assistant state
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

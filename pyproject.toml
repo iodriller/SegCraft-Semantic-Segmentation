@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE.md"]
-authors = [{ name = "iodriller" }]
+authors = [{ name = "oney-erge" }]
 keywords = ["semantic-segmentation", "computer-vision", "pytorch", "video", "segmentation"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -28,10 +28,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/iodriller/SegCraft-Semantic-Segmentation"
-Repository = "https://github.com/iodriller/SegCraft-Semantic-Segmentation"
-Issues = "https://github.com/iodriller/SegCraft-Semantic-Segmentation/issues"
-Changelog = "https://github.com/iodriller/SegCraft-Semantic-Segmentation/blob/master/CHANGELOG.md"
+Homepage = "https://github.com/oney-erge/SegCraft-Semantic-Segmentation"
+Repository = "https://github.com/oney-erge/SegCraft-Semantic-Segmentation"
+Issues = "https://github.com/oney-erge/SegCraft-Semantic-Segmentation/issues"
+Changelog = "https://github.com/oney-erge/SegCraft-Semantic-Segmentation/blob/master/CHANGELOG.md"
 
 [project.optional-dependencies]
 torch = [

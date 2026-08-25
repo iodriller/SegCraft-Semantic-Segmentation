@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## [0.1.5] - 2026-08-25
+
+### Added
+- One-command native launchers for Windows, macOS, and Linux with diagnostics and repair modes.
+- CPU-first Docker Compose deployment, optional NVIDIA device access, persistent outputs and model caches, and a health endpoint.
+- CI coverage for launcher syntax and container startup.
+
+### Changed
+- The web launcher now waits for readiness before opening a browser.
+- Tagged releases publish the Python package, GHCR image, distribution files, and GitHub release together.
+
 ## [0.1.4] - 2026-05-11
 
 ### Changed

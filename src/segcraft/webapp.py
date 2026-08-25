@@ -2,9 +2,13 @@
 
 import copy
 from html import escape
+import os
 import shutil
 import threading
+import time
+import urllib.request
 import uuid
+import webbrowser
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +36,10 @@ def create_app():
         ) from exc
 
     app = FastAPI(title="SegCraft")
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
@@ -461,7 +469,26 @@ def main() -> None:
             f"The web app requires optional dependencies. {INSTALL_HINTS['app']}"
         ) from exc
 
-    uvicorn.run("segcraft.webapp:create_app", factory=True, host="127.0.0.1", port=8000)
+    host = os.getenv("SEGCRAFT_HOST", "127.0.0.1")
+    port = int(os.getenv("SEGCRAFT_PORT", "8000"))
+    browse_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
+    url = f"http://{browse_host}:{port}"
+
+    if os.getenv("SEGCRAFT_OPEN_BROWSER", "1").lower() not in {"0", "false", "no"}:
+        def open_when_ready() -> None:
+            for _ in range(60):
+                try:
+                    with urllib.request.urlopen(f"{url}/health", timeout=1) as response:
+                        if response.status == 200:
+                            webbrowser.open(url)
+                            return
+                except OSError:
+                    time.sleep(0.5)
+
+        threading.Thread(target=open_when_ready, daemon=True).start()
+
+    print(f"SegCraft web app: {url}")
+    uvicorn.run("segcraft.webapp:create_app", factory=True, host=host, port=port)
 
 
 if __name__ == "__main__":

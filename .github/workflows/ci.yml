@@ -5,6 +5,23 @@ on:
   pull_request:
 
 jobs:
+  launchers:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check POSIX launcher syntax
+        if: runner.os != 'Windows'
+        run: bash -n run.sh run.command
+      - name: Check PowerShell launcher syntax
+        shell: pwsh
+        run: |
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path run.ps1), [ref]$null, [ref]$errors)
+          if ($errors) { $errors | Format-List; exit 1 }
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -45,3 +62,22 @@ jobs:
           pip install -e ".[dev,${{ matrix.extras }}]"
       - name: Smoke ${{ matrix.name }}
         run: ${{ matrix.command }}
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build image
+        run: docker compose build
+      - name: Start and verify
+        run: |
+          docker compose up --detach
+          for attempt in $(seq 1 60); do
+            curl --fail --silent http://127.0.0.1:8000/health && exit 0
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+      - name: Stop
+        if: always()
+        run: docker compose down --volumes

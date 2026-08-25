@@ -1,0 +1,11 @@
+.git
+.github
+.venv
+.env
+.env.*
+dist
+outputs
+data
+notebooks
+__pycache__
+*.pyc

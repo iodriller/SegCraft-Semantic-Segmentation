@@ -7,19 +7,39 @@ evaluating, and running image/video prediction from the same YAML setup.
 
 ## Install
 
-Use an isolated environment.
+From a checkout, use the same entry point on every platform. It installs a
+pinned `uv`, creates the local environment, starts the web app, waits until it
+is ready, and then opens it in your browser.
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\activate
-python -m pip install --upgrade pip
+.\run.bat
 ```
 
 ```bash
-pip install segcraft
+./run.command  # macOS
+./run.sh       # Linux
 ```
 
-Install only the extras you need:
+Run `doctor`, intentionally rebuild the environment with `repair`, or use the
+Docker path with the same launcher:
+
+```bash
+./run.sh doctor
+./run.sh repair
+./run.sh docker
+./run.sh logs
+./run.sh stop
+```
+
+The PowerShell equivalents are `.\run.ps1 doctor` and `.\run.ps1 docker`.
+Docker binds the UI only to `127.0.0.1:8000` and keeps outputs and model caches
+in named volumes. An NVIDIA host can opt into GPU access with:
+
+```bash
+docker compose -f compose.yaml -f compose.nvidia.yaml up --build
+```
+
+For package-only use, install just the extras you need:
 
 ```bash
 pip install "segcraft[torch]"                    # prediction/training with TorchVision
@@ -29,10 +49,10 @@ pip install "segcraft[torch,transformers,video]" # video files and YouTube helpe
 pip install "segcraft[web]"                      # FastAPI UI with video + default model backends
 ```
 
-From a checkout:
+For development from a checkout:
 
 ```bash
-pip install -e ".[web,dev]"
+uv sync --frozen --extra web --extra dev
 ```
 
 For NVIDIA GPUs, install the CUDA-enabled PyTorch wheel that matches your
@@ -138,4 +158,6 @@ twine check dist/*
 Publishing uses `.github/workflows/release.yml` with GitHub trusted publishing.
 Configure the PyPI/TestPyPI publisher for owner `oney-erge`, repository
 `SegCraft-Semantic-Segmentation`, workflow `release.yml`, and environment
-`pypi`, then run the workflow manually for the target repository.
+`pypi`. A `v*` tag publishes the package, container image, distribution files,
+and GitHub release. A manual run can publish to TestPyPI without making a
+release.

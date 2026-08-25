@@ -1,0 +1,15 @@
+services:
+  segcraft:
+    build: .
+    image: segcraft:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${SEGCRAFT_PORT:-8000}:8000"
+    volumes:
+      - segcraft-outputs:/app/outputs
+      - segcraft-cache:/home/segcraft/.cache
+
+volumes:
+  segcraft-outputs:
+  segcraft-cache:

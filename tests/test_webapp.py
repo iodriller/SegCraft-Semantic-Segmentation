@@ -23,6 +23,17 @@ def test_webapp_homepage_loads():
     assert "/cancel" in response.text
 
 
+def test_webapp_health_reports_ready():
+    from fastapi.testclient import TestClient
+
+    from segcraft.webapp import create_app
+
+    response = TestClient(create_app()).get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_webapp_runtime_endpoint_loads():
     from fastapi.testclient import TestClient
     from segcraft.webapp import create_app

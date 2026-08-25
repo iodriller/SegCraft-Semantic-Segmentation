@@ -26,8 +26,13 @@ open_url() { [ "$no_browser" -eq 1 ] && return; command -v open >/dev/null 2>&1 
 
 case "$action" in
   docker|stop|logs)
-    command -v docker >/dev/null 2>&1 || { echo "Docker is not installed." >&2; exit 1; }
-    docker info >/dev/null 2>&1 || { echo "Docker is installed but its engine is not running." >&2; exit 1; }
+    if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+      [ "$action" = stop ] && { echo "The native server runs in the foreground. Press Ctrl+C in its terminal to stop it."; exit 0; }
+      [ "$action" = logs ] && { echo "The native server writes logs to its foreground terminal."; exit 0; }
+      command -v docker >/dev/null 2>&1 || { echo "Docker is not installed." >&2; exit 1; }
+      echo "Docker is installed but its engine is not running." >&2
+      exit 1
+    fi
     [ "$action" = stop ] && exec docker compose down
     [ "$action" = logs ] && exec docker compose logs --follow
     docker compose up --detach --build

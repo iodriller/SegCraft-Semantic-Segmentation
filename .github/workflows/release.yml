@@ -139,4 +139,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           (cd dist && sha256sum *.whl *.tar.gz > SHA256SUMS)
-          gh release create "${RELEASE_TAG}" dist/* --generate-notes --title "SegCraft ${RELEASE_TAG}"
+          gh release create "${RELEASE_TAG}" dist/* --repo "${GITHUB_REPOSITORY}" --generate-notes --title "SegCraft ${RELEASE_TAG}"

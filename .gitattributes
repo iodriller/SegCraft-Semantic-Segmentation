@@ -1,0 +1,40 @@
+# Line endings, pinned per file type rather than left to each contributor's
+# core.autocrlf setting.
+#
+# Nothing is broken today - the blobs in this repository are already LF, and a
+# clone on Linux or macOS gets LF. But nothing enforced that: a contributor on
+# Windows with core.autocrlf=false commits exactly what is in their editor, and
+# a shell script committed with CRLF fails on the first line of real work with
+#
+#     set: pipefail: invalid option name
+#
+# which reads as a broken installer rather than a line-ending problem. This file
+# makes the outcome independent of who committed it.
+
+# Anything Git decides is text gets LF in the repository.
+* text=auto
+
+# Must be LF wherever they are checked out, because they run on Linux even when
+# they were written on Windows.
+*.sh          text eol=lf
+*.command     text eol=lf
+Dockerfile    text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+
+# Windows entry points, which cmd.exe and PowerShell expect to find as CRLF.
+*.bat         text eol=crlf
+*.cmd         text eol=crlf
+*.ps1         text eol=crlf
+
+# Never touched: conversion corrupts these.
+*.png         binary
+*.gif         binary
+*.jpg         binary
+*.ico         binary
+*.woff        binary
+*.woff2       binary
+*.ttf         binary
+*.msi         binary
+*.exe         binary
+*.pdf         binary

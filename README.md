@@ -31,6 +31,10 @@ Docker path with the same launcher:
 ./run.sh stop
 ```
 
+Setup checks available disk space, prevents two installs from changing the
+environment at the same time, and retries transient network failures up to
+three times. A failed setup leaves details in `.setup/install.log`.
+
 The PowerShell equivalents are `.\run.ps1 doctor` and `.\run.ps1 docker`.
 Docker binds the UI only to `127.0.0.1:8000` and keeps outputs and model caches
 in named volumes. An NVIDIA host can opt into GPU access with:

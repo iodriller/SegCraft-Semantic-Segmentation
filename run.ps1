@@ -36,6 +36,7 @@ function Wait-Ready {
   }
   return $false
 }
+function Test-Ready { try { Invoke-RestMethod -Uri "$Url/health" -TimeoutSec 2 | Out-Null; return $true } catch { return $false } }
 
 if ($Action -in @("docker", "stop", "logs")) {
   $docker = Get-Command docker -ErrorAction SilentlyContinue
@@ -75,6 +76,11 @@ Invoke-InstallRetry "dependency synchronization" {
   $output | Write-Host
 }
 Complete-Install
+if (Test-Ready) {
+  Write-Host "SegCraft is already running at $Url" -ForegroundColor Green
+  if (-not $NoBrowser) { Start-Process $Url }
+  exit 0
+}
 $env:SEGCRAFT_OPEN_BROWSER = if ($NoBrowser) { "0" } else { "1" }
 & $uv run --frozen --no-sync segcraft-web
 exit $LASTEXITCODE

@@ -52,7 +52,9 @@ function Write-InstallFailure {
   param($ErrorRecord)
   $message = if ($ErrorRecord.Exception) { $ErrorRecord.Exception.Message } else { [string]$ErrorRecord }
   Add-InstallLog "failure: $message"
-  Write-Host "Setup log: $script:InstallLog" -ForegroundColor Yellow
+  Write-Host ""
+  Write-Host "$script:InstallProduct setup failed: $message" -ForegroundColor Red
+  Write-Host "Read the full setup log: $script:InstallLog" -ForegroundColor Yellow
 }
 
 function Test-InstallTransientError {
